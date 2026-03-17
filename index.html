@@ -392,6 +392,133 @@
     header { padding: 0 20px; }
     .field-row.triple { grid-template-columns: 1fr 1fr; }
   }
+
+  /* ── Requests Inbox ── */
+  .inbox-bar {
+    background: #000;
+    border-bottom: 2px solid var(--red);
+    padding: 0 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 48px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .inbox-bar:hover { background: #0f0f0f; }
+  .inbox-bar-left {
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .inbox-badge {
+    background: var(--red);
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+  }
+  .inbox-badge.empty { background: var(--border); color: var(--muted); }
+  .inbox-arrow { color: var(--muted); font-size: 12px; transition: transform 0.2s; }
+  .inbox-arrow.open { transform: rotate(180deg); }
+
+  .inbox-panel {
+    display: none;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 40px;
+    max-height: 340px;
+    overflow-y: auto;
+  }
+  .inbox-panel.open { display: block; }
+  .inbox-empty {
+    text-align: center;
+    padding: 28px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .request-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--red);
+    border-radius: 2px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    transition: border-color 0.15s;
+  }
+  .request-card:hover { border-color: var(--red); }
+  .req-info { flex: 1; min-width: 0; }
+  .req-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text);
+    margin-bottom: 3px;
+  }
+  .req-route {
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 3px;
+  }
+  .req-meta {
+    font-size: 11px;
+    color: var(--dim);
+    font-family: 'DM Mono', monospace;
+  }
+  .req-tags { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+  .req-tag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .req-tag.rush { border-color: var(--red); color: var(--red); }
+  .btn-load {
+    background: var(--red);
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-radius: 2px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+  }
+  .btn-load:hover { opacity: 0.85; }
+  .btn-clear-all {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 6px 12px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 12px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-top: 4px;
+  }
+  .btn-clear-all:hover { border-color: var(--red); color: var(--red); }
+
 </style>
 </head>
 <body>
@@ -405,6 +532,20 @@
     <span class="header-sub">Canada · CAD · km</span>
   </div>
 </header>
+
+<!-- ── REQUESTS INBOX ── -->
+<div class="inbox-bar" onclick="toggleInbox()">
+  <div class="inbox-bar-left">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.45 2 2 0 0 1 3.59 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 5.49 5.49l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 15.46v1.46z"/></svg>
+    Incoming Quote Requests
+    <span class="inbox-badge empty" id="inboxBadge">0</span>
+  </div>
+  <span class="inbox-arrow" id="inboxArrow">▼</span>
+</div>
+<div class="inbox-panel" id="inboxPanel">
+  <div id="inboxContent"><div class="inbox-empty">No pending requests yet.<br>Submitted forms will appear here automatically.</div></div>
+</div>
+
 
 <div class="container">
   <div>
@@ -864,6 +1005,111 @@ function generatePDF() {
 const td=new Date(); td.setDate(td.getDate()+3);
 g('delivDate').value=td.toISOString().split('T')[0];
 recalc();
+
+// ── INBOX ─────────────────────────────────────────────────────────────
+function toggleInbox() {
+  const panel = document.getElementById('inboxPanel');
+  const arrow = document.getElementById('inboxArrow');
+  panel.classList.toggle('open');
+  arrow.classList.toggle('open');
+  if(panel.classList.contains('open')) renderInbox();
+}
+
+function loadInbox() {
+  const requests = JSON.parse(localStorage.getItem('kg_quote_requests') || '[]');
+  const badge = document.getElementById('inboxBadge');
+  if(requests.length > 0) {
+    badge.textContent = requests.length;
+    badge.classList.remove('empty');
+  } else {
+    badge.textContent = '0';
+    badge.classList.add('empty');
+  }
+}
+
+function renderInbox() {
+  const requests = JSON.parse(localStorage.getItem('kg_quote_requests') || '[]');
+  const content = document.getElementById('inboxContent');
+  if(requests.length === 0) {
+    content.innerHTML = '<div class="inbox-empty">No pending requests yet.<br>Submitted forms will appear here automatically.</div>';
+    return;
+  }
+  let html2 = '';
+  requests.forEach((req, idx) => {
+    const isRush = req.urgency && req.urgency.toLowerCase().includes('rush');
+    html2 += `
+      <div class="request-card">
+        <div class="req-info">
+          <div class="req-name">${req.name}${req.company ? ' &mdash; ' + req.company : ''}</div>
+          <div class="req-route">📍 ${req.pickup || '—'} &rarr; ${req.dropoff || '—'}</div>
+          <div class="req-meta">${req.submitted} &nbsp;·&nbsp; ${req.pkgSize || 'Standard'} &nbsp;·&nbsp; ${req.date || 'TBD'}</div>
+        </div>
+        <div class="req-tags">
+          ${isRush ? '<span class="req-tag rush">Rush</span>' : '<span class="req-tag">Standard</span>'}
+          <button class="btn-load" onclick="loadRequest(${idx})">Load →</button>
+        </div>
+      </div>`;
+  });
+  html2 += '<button class="btn-clear-all" onclick="clearAllRequests()">Clear All Requests</button>';
+  content.innerHTML = html2;
+}
+
+function loadRequest(idx) {
+  const requests = JSON.parse(localStorage.getItem('kg_quote_requests') || '[]');
+  const req = requests[idx];
+  if(!req) return;
+
+  // Fill customer fields
+  if(g('custName'))  g('custName').value  = (req.name || '') + (req.company ? ' — ' + req.company : '');
+  if(g('custEmail')) g('custEmail').value = req.email  || '';
+  if(g('custPhone')) g('custPhone').value = req.phone  || '';
+
+  // Fill delivery fields
+  if(g('addrA'))    g('addrA').value    = req.pickup  || '';
+  if(g('addrB'))    g('addrB').value    = req.dropoff || '';
+  if(g('delivDate'))g('delivDate').value= req.date    || '';
+  if(g('pkgDesc'))  g('pkgDesc').value  = req.pkgDesc || '';
+
+  // Package size
+  const sizeMap = { 'Standard':'standard', 'Large':'large', 'Oversized':'oversized' };
+  if(g('pkgSize') && req.pkgSize) g('pkgSize').value = sizeMap[req.pkgSize] || 'standard';
+
+  // Urgency surcharge
+  if(req.urgency && req.urgency.toLowerCase().includes('rush')) {
+    surcharges.urgent = true;
+    document.getElementById('tog-urgent').classList.add('active');
+  }
+
+  // Internal notes
+  if(g('internalNotes') && req.notes) g('internalNotes').value = req.notes;
+
+  recalc();
+
+  // Close inbox and scroll to form
+  document.getElementById('inboxPanel').classList.remove('open');
+  document.getElementById('inboxArrow').classList.remove('open');
+  document.querySelector('.container').scrollIntoView({ behavior: 'smooth' });
+
+  // Update lookup status
+  const status = document.getElementById('lookupStatus');
+  if(status) {
+    status.className = 'lookup-status ok';
+    status.textContent = '✓ Loaded from customer request — enter distance or use Lookup';
+  }
+}
+
+function clearAllRequests() {
+  if(confirm('Clear all pending requests?')) {
+    localStorage.removeItem('kg_quote_requests');
+    loadInbox();
+    renderInbox();
+  }
+}
+
+// Load inbox on page load
+loadInbox();
+setInterval(loadInbox, 5000); // refresh badge every 5s
+
 </script>
 </body>
 </html>
