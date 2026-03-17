@@ -679,166 +679,152 @@ function generatePDF() {
 
   const company  = g('companyName').value || 'Khair Group';
   const custName = g('custName').value    || 'Valued Customer';
-  const custEmail= g('custEmail').value   || '';
   const custPhone= g('custPhone').value   || '';
-  const custAddr = [g('addrB').value].filter(Boolean).join(', ') || '';
-  const delDate  = g('delivDate').value
-    ? new Date(g('delivDate').value + 'T12:00:00').toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'})
-    : 'TBD';
+  const custEmail= g('custEmail').value   || '';
 
+  // jsPDF in 'pt' units, letter size, with Y going TOP-DOWN via coordinate flip
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   const W = 612, H = 792;
   const PL = 51, PR = 597;
 
-  // colour helpers
-  const setFill   = (r,g,b) => doc.setFillColor(r,g,b);
-  const setStroke = (r,g,b) => doc.setDrawColor(r,g,b);
-  const setTxt    = (r,g,b) => doc.setTextColor(r,g,b);
+  // Flip y: jsPDF origin is bottom-left, we work top-down
+  const Y = y => H - y;
 
-  const RED  = [204,31,31];
-  const BLK  = [15,15,15];
-  const MGR  = [120,120,120];
-  const DGR  = [50,50,50];
-  const LGR  = [220,220,220];
-  const WHT  = [255,255,255];
+  const sf = (r,g2,b) => doc.setFillColor(r,g2,b);
+  const ss = (r,g2,b) => doc.setDrawColor(r,g2,b);
+  const st = (r,g2,b) => doc.setTextColor(r,g2,b);
 
-  const PT = H - 34; // top y
+  const RED=[204,31,31], BLK=[15,15,15], MGR=[120,120,120],
+        DGR=[50,50,50],  LGR=[220,220,220], WHT=[255,255,255];
 
-  // ── LOGO ──────────────────────────────────────────────────────────────
-  try {
-    doc.addImage(LOGO_DATA_URI, 'PNG', PL, PT - 78, 90, 78, undefined, 'FAST');
-  } catch(e) {}
+  // ── LOGO ────────────────────────────────────────────────────────────
+  try { doc.addImage(LOGO_DATA_URI,'PNG', PL, Y(20+78), 90, 78, undefined,'FAST'); } catch(e){}
 
   // Taglines
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); setTxt(...RED);
-  doc.text('6PL – SIXTH-PARTY LOGISTICS', PL, PT - 84);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); setTxt(...DGR);
-  doc.text('BEYOND DELIVERY – WE BUILD MOMENTUM', PL, PT - 94);
+  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); st(...RED);
+  doc.text('6PL \u2013 SIXTH-PARTY LOGISTICS', PL, Y(102));
+  doc.setFont('helvetica','normal'); doc.setFontSize(7); st(...DGR);
+  doc.text('BEYOND DELIVERY \u2013 WE BUILD MOMENTUM', PL, Y(112));
 
-  // ── QUOTE heading ─────────────────────────────────────────────────────
-  doc.setFont('helvetica','bold'); doc.setFontSize(48); setTxt(...LGR);
-  doc.text('QUOTE', PR, PT - 30, {align:'right'});
+  // ── QUOTE heading ──────────────────────────────────────────────────
+  doc.setFont('helvetica','bold'); doc.setFontSize(48); st(...LGR);
+  doc.text('QUOTE', PR, Y(48), {align:'right'});
 
-  // ── Meta block ────────────────────────────────────────────────────────
-  const bx = PR - 170, by = PT - 52;
-  const metaRow = (label, value, y) => {
-    doc.setFont('helvetica','bold'); doc.setFontSize(9); setTxt(...BLK);
-    doc.text(label, bx, y);
+  // Meta rows
+  const bx = PR - 170;
+  const metaRow = (label, value, yt) => {
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); st(...BLK);
+    doc.text(label, bx, Y(yt));
     doc.setFont('helvetica','normal');
-    doc.text(value, PR, y, {align:'right'});
+    doc.text(value, PR, Y(yt), {align:'right'});
   };
-  metaRow('DATE:',       dateFmt(today),    by);
-  metaRow('QUOTE #:',    ref,               by - 14);
-  metaRow('VALID TILL:', dateFmt(validUntil), by - 28);
+  metaRow('DATE:',       dateFmt(today),       62);
+  metaRow('QUOTE #:',    ref,                  76);
+  metaRow('VALID TILL:', dateFmt(validUntil),  90);
 
-  // ── Red rule ──────────────────────────────────────────────────────────
-  setStroke(...RED); doc.setLineWidth(1.2);
-  doc.line(PL, PT - 103, PR, PT - 103);
+  // Red rule
+  ss(...RED); doc.setLineWidth(1.2);
+  doc.line(PL, Y(118), PR, Y(118));
 
-  // ── Company address ───────────────────────────────────────────────────
-  let y = PT - 117;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); setTxt(...BLK);
-  ['33 Osborn Ave','Brantford, ON, CA, N3T 6R1','(647) 709-4052','www.khairgroup.ca'].forEach(line => {
-    doc.text(line, PL, y); y -= 12;
-  });
+  // Company address
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); st(...BLK);
+  ['33 Osborn Ave','Brantford, ON, CA, N3T 6R1','(647) 709-4052','www.khairgroup.ca']
+    .forEach((line,i) => doc.text(line, PL, Y(132 + i*12)));
 
-  // ── Client block ──────────────────────────────────────────────────────
+  // Client block
   const cx = W/2 + 10, valX = cx + 52;
-  let cy = PT - 110;
-
+  let cy = 126;
   const clientRow = (label, value) => {
-    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); setTxt(...BLK);
-    doc.text(label, cx, cy);
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); st(...BLK);
+    doc.text(label, cx, Y(cy));
     doc.setFont('helvetica','normal');
     const lines = doc.splitTextToSize(value, PR - valX);
-    doc.text(lines[0], valX, cy);
-    for(let i=1;i<lines.length;i++){ cy -= 11; doc.text(lines[i], valX, cy); }
-    cy -= 12;
+    doc.text(lines[0], valX, Y(cy));
+    for(let i=1;i<lines.length;i++){ cy+=11; doc.text(lines[i], valX, Y(cy)); }
+    cy += 12;
   };
-
   clientRow('Name',    custName);
-  clientRow('Address', custAddr || g('addrB').value || '—');
+  clientRow('Address', g('addrB').value || '—');
   clientRow('Contact', custPhone || custEmail || '—');
 
-  // ── Line-item table ───────────────────────────────────────────────────
-  const tableTop = PT - 205;
+  // ── Table ──────────────────────────────────────────────────────────
+  const tableTopY = 210;
   const colX = [PL, 340, 420, 470, PR];
-  const colW = colX.map((x,i) => i < 4 ? colX[i+1]-x : 0).slice(0,4);
-  const headers = ['DESCRIPTION','PRICE','QTY','AMOUNT'];
-  const aligns  = ['left','center','center','right'];
+  const colW = [289, 80, 50, 50, 0].slice(0,4); // widths
+  const hdrs   = ['DESCRIPTION','PRICE','QTY','AMOUNT'];
+  const aligns = ['left','center','center','right'];
   const rowH = 20, hdrH = 22;
 
-  const drawCell = (x, cy2, w, h, fillColor) => {
-    if(fillColor){ setFill(...fillColor); doc.rect(x, cy2, w, h, 'F'); }
-    setStroke(...LGR); doc.setLineWidth(0.4);
-    doc.rect(x, cy2, w, h, 'S');
+  const drawCell = (x, yt, w, h, fill) => {
+    if(fill){ sf(...fill); doc.rect(x, Y(yt+h), w, h, 'F'); }
+    ss(...LGR); doc.setLineWidth(0.4);
+    doc.rect(x, Y(yt+h), w, h, 'S');
+  };
+  const cellTxt = (text, x, w, yt, h, align, bold, size, color) => {
+    doc.setFont('helvetica', bold?'bold':'normal');
+    doc.setFontSize(size||8.5); st(...(color||BLK));
+    const ty = Y(yt + h - 7);
+    if(align==='left')        doc.text(text, x+4,   ty);
+    else if(align==='center') doc.text(text, x+w/2, ty, {align:'center'});
+    else                      doc.text(text, x+w-4, ty, {align:'right'});
   };
 
-  const cellText = (text, x, w, cy2, align, bold, size, color) => {
-    doc.setFont('helvetica', bold ? 'bold' : 'normal');
-    doc.setFontSize(size || 8.5);
-    setTxt(...(color || BLK));
-    if(align==='left')        doc.text(text, x+4, cy2);
-    else if(align==='center') doc.text(text, x+w/2, cy2, {align:'center'});
-    else                      doc.text(text, x+w-4, cy2, {align:'right'});
-  };
+  // Recalculate colW from colX
+  const cW = [colX[1]-colX[0], colX[2]-colX[1], colX[3]-colX[2], colX[4]-colX[3]];
 
   // Header
-  headers.forEach((hdr, i) => {
-    drawCell(colX[i], tableTop - hdrH, colW[i], hdrH, LGR);
-    cellText(hdr, colX[i], colW[i], tableTop - hdrH + 7, aligns[i], true, 8);
+  hdrs.forEach((hdr,i) => {
+    drawCell(colX[i], tableTopY, cW[i], hdrH, LGR);
+    cellTxt(hdr, colX[i], cW[i], tableTopY, hdrH, aligns[i], true, 8);
   });
 
-  // Build line items from quote calculation
+  // Build items from quote data
+  const delivDesc = `Pickup & Delivery \u2014 ${g('addrA').value||'Location A'} to ${g('addrB').value||'Location B'} (${q.km.toFixed(0)} km)`;
+  const delivAmt  = q.base + q.distCost + q.fuelCostTotal + q.labourCost;
   const items = [
-    { desc: `Pickup & Delivery — ${g('addrA').value||'Location A'} to ${g('addrB').value||'Location B'} (${q.km.toFixed(0)} km)`,
-      price: fmt(q.base + q.distCost + q.fuelCostTotal + q.labourCost), qty: '1',
-      amount: fmt(q.base + q.distCost + q.fuelCostTotal + q.labourCost) },
+    { desc: delivDesc, price: fmt(delivAmt), qty:'1', amount: fmt(delivAmt) },
     ...q.surchargeItems.map(([lbl,amt]) => ({
-      desc: lbl + ' Surcharge', price: fmt(amt), qty: '1', amount: fmt(amt)
+      desc: lbl+' Surcharge', price: fmt(amt), qty:'1', amount: fmt(amt)
     }))
   ];
 
   const NUM_ROWS = 10;
-  const yRow = tableTop - hdrH;
-  for(let r = 0; r < NUM_ROWS; r++){
-    const rowY = yRow - r * rowH;
-    colW.forEach((w,i) => drawCell(colX[i], rowY - rowH, w, rowH));
+  for(let r=0; r<NUM_ROWS; r++){
+    const yt = tableTopY + hdrH + r*rowH;
+    cW.forEach((w,i) => drawCell(colX[i], yt, w, rowH));
     if(r < items.length){
       const item = items[r];
       [item.desc, item.price, item.qty, item.amount].forEach((val,i) => {
-        cellText(val, colX[i], colW[i], rowY - rowH + 6, aligns[i]);
+        cellTxt(val, colX[i], cW[i], yt, rowH, aligns[i]);
       });
     }
   }
 
-  const tableBottom = yRow - NUM_ROWS * rowH;
+  const tableBottomY = tableTopY + hdrH + NUM_ROWS * rowH;
 
-  // ── Totals ────────────────────────────────────────────────────────────
+  // Totals
   const hst = q.total * 0.13;
   const finalTotal = q.total + hst;
-  const totRows = [
-    ['TOTAL',   fmt(q.total),    false],
-    ['DISC.',   '$0.00',         false],
-    ['HST/GST', fmt(hst),        false],
-    ['FINAL',   fmt(finalTotal), true ],
-  ];
-
-  let ty2 = tableBottom;
-  totRows.forEach(([lbl, val, isFinal]) => {
-    const txtC = isFinal ? WHT : BLK;
-    drawCell(colX[2], ty2 - rowH, colW[2], rowH, isFinal ? RED : LGR);
-    drawCell(colX[3], ty2 - rowH, colW[3], rowH, isFinal ? RED : null);
-    cellText(lbl, colX[2], colW[2], ty2 - rowH + 6, 'center', true, 8.5, txtC);
-    cellText(val, colX[3], colW[3], ty2 - rowH + 6, 'right', isFinal, 8.5, txtC);
-    ty2 -= rowH;
+  [['TOTAL', fmt(q.total), false],
+   ['DISC.', '$0.00',      false],
+   ['HST/GST', fmt(hst),   false],
+   ['FINAL', fmt(finalTotal), true]
+  ].forEach(([lbl, val, isFinal], idx) => {
+    const yt = tableBottomY + idx * rowH;
+    const tc = isFinal ? WHT : BLK;
+    drawCell(colX[2], yt, cW[2], rowH, isFinal ? RED : LGR);
+    drawCell(colX[3], yt, cW[3], rowH, isFinal ? RED : null);
+    cellTxt(lbl, colX[2], cW[2], yt, rowH, 'center', true,  8.5, tc);
+    cellTxt(val, colX[3], cW[3], yt, rowH, 'right',  isFinal, 8.5, tc);
   });
 
-  // ── Terms & Conditions ────────────────────────────────────────────────
-  let tcY = ty2 - 18;
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); setTxt(...BLK);
-  doc.text('TERMS & CONDITIONS', PL, tcY);
-  tcY -= 13;
+  const totalsBottomY = tableBottomY + 4 * rowH;
+
+  // Terms
+  let tcY = totalsBottomY + 18;
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); st(...BLK);
+  doc.text('TERMS & CONDITIONS', PL, Y(tcY));
+  tcY += 13;
 
   const terms = [
     `Prices valid until ${dateFmt(validUntil)}.`,
@@ -852,24 +838,23 @@ function generatePDF() {
     'Any changes to the delivery address or schedule after booking confirmation may result in revised pricing.',
     'All quotes are in Canadian Dollars (CAD) and include applicable surcharges as itemized above.',
   ];
-
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.8); setTxt(...DGR);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.8); st(...DGR);
   terms.forEach(t => {
     const lines = doc.splitTextToSize('• ' + t, PR - PL);
     lines.forEach(line => {
-      if(tcY < 40) return;
-      doc.text(line, PL, tcY);
-      tcY -= 10;
+      if(tcY > H - 40) return;
+      doc.text(line, PL, Y(tcY));
+      tcY += 10;
     });
-    tcY -= 2;
+    tcY += 2;
   });
 
-  // ── Footer ────────────────────────────────────────────────────────────
-  setStroke(...RED); doc.setLineWidth(1.0);
-  doc.line(PL, 28, PR, 28);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); setTxt(...MGR);
-  doc.text(`${company}  ·  33 Osborn Ave, Brantford, ON  ·  (647) 709-4052  ·  www.khairgroup.ca`,
-           W/2, 18, {align:'center'});
+  // Footer
+  ss(...RED); doc.setLineWidth(1.0);
+  doc.line(PL, Y(H-28), PR, Y(H-28));
+  doc.setFont('helvetica','normal'); doc.setFontSize(7); st(...MGR);
+  doc.text(`${company}  \u00b7  33 Osborn Ave, Brantford, ON  \u00b7  (647) 709-4052  \u00b7  www.khairgroup.ca`,
+           W/2, Y(H-18), {align:'center'});
 
   doc.save(`KG_Quote_${ref}.pdf`);
   const t=g('toast'); t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000);
