@@ -650,6 +650,37 @@
     font-family: 'Barlow', sans-serif;
   }
 
+
+  /* ── Discount field ── */
+  .discount-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .discount-wrap .field { flex: 1; }
+  .disc-type-toggle {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .disc-type-btn {
+    padding: 10px 12px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    background: var(--surface2);
+    color: var(--muted);
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .disc-type-btn.active { background: var(--red); color: white; }
+
 </style>
 </head>
 <body>
@@ -797,7 +828,19 @@
           </div>
         </div>
         <hr class="section-divider">
-        <div class="field-row single">
+        <!-- Discount -->
+        <div class="discount-wrap">
+          <div class="field">
+            <label>Discount</label>
+            <input type="number" id="discountValue" min="0" step="0.01" placeholder="0" oninput="recalc()">
+          </div>
+          <div class="disc-type-toggle">
+            <button class="disc-type-btn active" id="discBtn-flat" onclick="setDiscType('flat', this)">$ Flat</button>
+            <button class="disc-type-btn" id="discBtn-pct" onclick="setDiscType('pct', this)">% Off</button>
+          </div>
+        </div>
+
+        <div class="field-row single" style="margin-top:14px;">
           <div class="field"><label>Internal Notes (not shown to customer)</label><textarea id="internalNotes" placeholder="e.g. Gate code #1234, deliver before noon"></textarea></div>
         </div>
       </div>
@@ -824,6 +867,7 @@
         <div class="cost-line"><span class="lbl">Labour (<span id="pHrLabel">0</span> hrs)</span><span class="val" id="pLabour">—</span></div>
         <div id="surchargeLines"></div>
         <div class="cost-line"><span class="lbl">Subtotal</span><span class="val" id="pSubtotal">—</span></div>
+        <div class="cost-line" id="discountLine" style="display:none;"><span class="lbl">Discount</span><span class="val" id="pDiscount" style="color:#4caf7d;">—</span></div>
         <div class="cost-line"><span class="lbl">Margin (<span id="pMarginPct">20</span>%)</span><span class="val" id="pMargin">—</span></div>
         <div class="cost-total">
           <span class="lbl">Total (CAD)</span>
@@ -913,9 +957,16 @@ function calcQuote() {
   if (surcharges.stairs)     { surchargeTotal += 15; surchargeItems.push(['Stairs/No Elevator', 15]); }
   if (g('pkgSize').value === 'oversized') { const f = v('oversizedFee'); surchargeTotal += f; surchargeItems.push(['Oversized Package', f]); }
   const subtotal = base + distCost + fuelCostTotal + labourCost + surchargeTotal;
-  const marginAmt = subtotal * (marginPct / 100);
-  const total = subtotal + marginAmt;
-  return { base, km, litres, hrs, distCost, fuelCostTotal, labourCost, surchargeTotal, surchargeItems, subtotal, marginPct, marginAmt, total };
+
+  // Discount
+  const discVal  = parseFloat(document.getElementById('discountValue')?.value) || 0;
+  const discType = window._discType || 'flat';
+  const discAmt  = discType === 'pct' ? subtotal * (discVal/100) : discVal;
+  const afterDisc = Math.max(0, subtotal - discAmt);
+
+  const marginAmt = afterDisc * (marginPct / 100);
+  const total = afterDisc + marginAmt;
+  return { base, km, litres, hrs, distCost, fuelCostTotal, labourCost, surchargeTotal, surchargeItems, subtotal, discAmt, discType, discVal, afterDisc, marginPct, marginAmt, total };
 }
 
 function recalc() {
@@ -930,6 +981,13 @@ function recalc() {
   g('pHrLabel').textContent = q.hrs.toFixed(1);
   g('pLabour').textContent  = fmt(q.labourCost);
   g('pSubtotal').textContent = fmt(q.subtotal);
+  // Discount line
+  if(q.discAmt > 0) {
+    g('discountLine').style.display = 'flex';
+    g('pDiscount').textContent = '- ' + fmt(q.discAmt) + (q.discType==='pct' ? ' (' + q.discVal + '%)' : '');
+  } else {
+    g('discountLine').style.display = 'none';
+  }
   g('pMarginPct').textContent = q.marginPct;
   g('pMargin').textContent  = fmt(q.marginAmt);
   g('pTotal').textContent   = fmt(q.total);
@@ -1093,9 +1151,11 @@ function generatePDF() {
 
   // ── TOTALS ──────────────────────────────────────────────────
   const TB = TT + HH + NR*RH;
-  const hst = q.total * 0.13;
-  const finalAmt = q.total + hst;
-  [['TOTAL', fmt(q.total), false], ['DISC.','$0.00',false],
+  // HST calculated on the pre-margin subtotal after discount
+  const preMargin = q.afterDisc !== undefined ? q.afterDisc : q.subtotal;
+  const hst = preMargin * 0.13;
+  const finalAmt = preMargin + hst;
+  [['TOTAL', fmt(q.total), false], ['DISC.', q.discAmt > 0 ? '- ' + fmt(q.discAmt) : '$0.00', false],
    ['HST/GST', fmt(hst), false],   ['FINAL', fmt(finalAmt), true]]
     .forEach(([lbl,val,fin],i) => {
       const ry = TB + i*RH;
@@ -1130,6 +1190,10 @@ function generatePDF() {
     });
     tcY += 1;
   });
+
+  // ── CLOSING LINE ────────────────────────────────────────────────
+  doc.setFont('helvetica','bolditalic'); doc.setFontSize(9); st(...RED);
+  doc.text('We look forward to your business!', 306, tcY + 10, {align:'center'});
 
   // ── FOOTER ──────────────────────────────────────────────────
   ss(...RED); doc.setLineWidth(0.8); doc.line(PL, 758, PR, 758);
@@ -1301,6 +1365,8 @@ function buildEmailBody() {
     '',
     'Should you have any questions or require any amendments to this quote, please do not hesitate to reach out.',
     '',
+    'We look forward to your business!',
+    '',
     'Kind regards,',
     '',
     company,
@@ -1364,6 +1430,16 @@ function generateAndEmail() {
     const ref = g('quoteRef').value || '';
     g('emailSubject').value = `Delivery Quote ${ref} — Khair Group`;
   }
+}
+
+
+// Discount type toggle
+window._discType = 'flat';
+function setDiscType(type, btn) {
+  window._discType = type;
+  document.querySelectorAll('.disc-type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  recalc();
 }
 
 </script>
