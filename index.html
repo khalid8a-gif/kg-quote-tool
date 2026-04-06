@@ -1185,7 +1185,8 @@ function generatePDF() {
   const toLine     = 'To:   ' + addrB;
 
   // Wrap each sub-line independently within description column
-  const fromWrapped = doc.setFontSize(7.5) || doc.splitTextToSize(fromLine, descColW);
+  doc.setFontSize(7.5);
+  const fromWrapped = doc.splitTextToSize(fromLine, descColW);
   const toWrapped   = doc.splitTextToSize(toLine,   descColW);
   const subLineCount = fromWrapped.length + toWrapped.length;
   const routeRH = RH + subLineCount * 9 + 4; // dynamic height
