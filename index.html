@@ -681,6 +681,23 @@
   }
   .disc-type-btn.active { background: var(--red); color: white; }
 
+
+  /* ── HST exempt toggle ── */
+  .hst-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 14px; padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .hst-exempt-label {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--muted); cursor: pointer;
+    user-select: none;
+  }
+  .hst-exempt-label input[type=checkbox] {
+    width: 16px; height: 16px; accent-color: var(--red);
+    cursor: pointer; background: none; border: none; padding: 0;
+  }
+
 </style>
 </head>
 <body>
@@ -769,6 +786,9 @@
           <div class="field"><label>Phone Number</label><input type="tel" id="custPhone" placeholder="(416) 555-0100"></div>
           <div class="field"><label>Quote Reference #</label><input type="text" id="quoteRef" placeholder="Auto-generated"></div>
         </div>
+        <div class="field-row single">
+          <div class="field"><label>Customer Address</label><input type="text" id="custAddr" placeholder="248 Grand River Ave, Brantford, ON"></div>
+        </div>
       </div>
     </div>
 
@@ -840,6 +860,15 @@
           </div>
         </div>
 
+        <!-- HST Exempt -->
+        <div class="hst-row">
+          <label class="hst-exempt-label">
+            <input type="checkbox" id="hstExempt" onchange="recalc()">
+            HST/GST Exempt (0%)
+          </label>
+          <span style="font-size:11px;color:var(--dim);margin-left:auto;">Default: 13% Ontario HST</span>
+        </div>
+
         <div class="field-row single" style="margin-top:14px;">
           <div class="field"><label>Internal Notes (not shown to customer)</label><textarea id="internalNotes" placeholder="e.g. Gate code #1234, deliver before noon"></textarea></div>
         </div>
@@ -869,8 +898,9 @@
         <div class="cost-line"><span class="lbl">Subtotal</span><span class="val" id="pSubtotal">—</span></div>
         <div class="cost-line" id="discountLine" style="display:none;"><span class="lbl">Discount</span><span class="val" id="pDiscount" style="color:#4caf7d;">—</span></div>
         <div class="cost-line"><span class="lbl">Margin (<span id="pMarginPct">20</span>%)</span><span class="val" id="pMargin">—</span></div>
+        <div class="cost-line"><span class="lbl">HST/GST (<span id="pHstPct">13</span>%)</span><span class="val" id="pHst">—</span></div>
         <div class="cost-total">
-          <span class="lbl">Total (CAD)</span>
+          <span class="lbl">Final (CAD)</span>
           <span class="val" id="pTotal">$0.00</span>
         </div>
         <div class="preview-note" id="previewNote">Enter distance & drive time to see a live estimate.</div>
@@ -956,17 +986,29 @@ function calcQuote() {
   if (surcharges.fragile)    { const f = v('fragileFee');    surchargeTotal += f; surchargeItems.push(['Fragile Handling', f]); }
   if (surcharges.stairs)     { surchargeTotal += 15; surchargeItems.push(['Stairs/No Elevator', 15]); }
   if (g('pkgSize').value === 'oversized') { const f = v('oversizedFee'); surchargeTotal += f; surchargeItems.push(['Oversized Package', f]); }
-  const subtotal = base + distCost + fuelCostTotal + labourCost + surchargeTotal;
+  const subtotal  = base + distCost + fuelCostTotal + labourCost + surchargeTotal;
 
   // Discount
-  const discVal  = parseFloat(document.getElementById('discountValue')?.value) || 0;
-  const discType = window._discType || 'flat';
-  const discAmt  = discType === 'pct' ? subtotal * (discVal/100) : discVal;
+  const discVal   = parseFloat(document.getElementById('discountValue')?.value) || 0;
+  const discType  = window._discType || 'flat';
+  const discAmt   = discType === 'pct' ? subtotal * (discVal/100) : Math.min(discVal, subtotal);
   const afterDisc = Math.max(0, subtotal - discAmt);
 
+  // Margin applied after discount
   const marginAmt = afterDisc * (marginPct / 100);
-  const total = afterDisc + marginAmt;
-  return { base, km, litres, hrs, distCost, fuelCostTotal, labourCost, surchargeTotal, surchargeItems, subtotal, discAmt, discType, discVal, afterDisc, marginPct, marginAmt, total };
+  const preHst    = afterDisc + marginAmt;   // subtotal after disc + margin
+
+  // HST
+  const hstExempt = document.getElementById('hstExempt')?.checked || false;
+  const hstRate   = hstExempt ? 0 : 0.13;
+  const hstAmt    = preHst * hstRate;
+  const total     = preHst + hstAmt;         // grand final
+
+  return { base, km, litres, hrs, distCost, fuelCostTotal, labourCost,
+           surchargeTotal, surchargeItems, subtotal,
+           discAmt, discType, discVal, afterDisc,
+           marginPct, marginAmt, preHst,
+           hstExempt, hstRate, hstAmt, total };
 }
 
 function recalc() {
@@ -981,7 +1023,6 @@ function recalc() {
   g('pHrLabel').textContent = q.hrs.toFixed(1);
   g('pLabour').textContent  = fmt(q.labourCost);
   g('pSubtotal').textContent = fmt(q.subtotal);
-  // Discount line
   if(q.discAmt > 0) {
     g('discountLine').style.display = 'flex';
     g('pDiscount').textContent = '- ' + fmt(q.discAmt) + (q.discType==='pct' ? ' (' + q.discVal + '%)' : '');
@@ -989,8 +1030,10 @@ function recalc() {
     g('discountLine').style.display = 'none';
   }
   g('pMarginPct').textContent = q.marginPct;
-  g('pMargin').textContent  = fmt(q.marginAmt);
-  g('pTotal').textContent   = fmt(q.total);
+  g('pMargin').textContent    = fmt(q.marginAmt);
+  g('pHstPct').textContent    = q.hstExempt ? '0' : '13';
+  g('pHst').textContent       = fmt(q.hstAmt);
+  g('pTotal').textContent     = fmt(q.total);
   let sLines = '';
   q.surchargeItems.forEach(([lbl, amt]) => {
     sLines += `<div class="cost-line"><span class="lbl">${lbl}</span><span class="val">${fmt(amt)}</span></div>`;
@@ -1043,136 +1086,162 @@ function generatePDF() {
   const ref        = generateQuoteRef();
   const today      = new Date();
   const validUntil = new Date(today.getTime() + v('validDays') * 86400000);
-  const dateFmt    = d => d.toLocaleDateString('en-CA', {year:'numeric',month:'long',day:'numeric'});
+  const dateFmt    = d => d.toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
 
-  const company    = g('companyName').value || 'Khair Group';
-  const custName   = g('custName').value    || 'Valued Customer';
-  const custPhone  = g('custPhone').value   || '';
-  const custEmail  = g('custEmail').value   || '';
+  const company   = g('companyName').value || 'Khair Group';
+  const custName  = g('custName').value    || 'Valued Customer';
+  const custPhone = g('custPhone').value   || '';
+  const custEmail = g('custEmail').value   || '';
+  const custAddr  = g('custAddr')  ? (g('custAddr').value  || '') : '';
 
-  // jsPDF: unit=pt, format=letter → 612×792, origin TOP-LEFT, y increases DOWN
   const doc = new jsPDF({ unit:'pt', format:'letter', orientation:'portrait' });
-  const PL=62, PR=590, PB=770;   // left, right, page-bottom safety
+  const PL=62, PR=590, PB=748;
 
   const sf = (r,g2,b) => doc.setFillColor(r,g2,b);
   const ss = (r,g2,b) => doc.setDrawColor(r,g2,b);
   const st = (r,g2,b) => doc.setTextColor(r,g2,b);
 
-  const RED=[204,31,31], BLK=[15,15,15], MGR=[120,120,120],
-        DGR=[50,50,50],  LGR=[220,220,220], WHT=[255,255,255], VLG=[245,245,245];
+  const RED=[204,31,31],BLK=[15,15,15],MGR=[120,120,120],
+        DGR=[50,50,50], LGR=[220,220,220],WHT=[255,255,255],VLG=[245,245,245];
 
-  // Helper: draw bordered/filled cell. x,y = top-left of cell
   const cell = (x,y,w,h,fill) => {
     if(fill){ sf(...fill); doc.rect(x,y,w,h,'F'); }
     ss(...LGR); doc.setLineWidth(0.4); doc.rect(x,y,w,h,'S');
   };
-
-  // Helper: text in cell. x,y = top-left of cell
   const ctxt = (txt,x,w,y,h,aln,bold,sz,col) => {
-    doc.setFont('helvetica', bold?'bold':'normal');
+    doc.setFont('helvetica',bold?'bold':'normal');
     doc.setFontSize(sz||8.5); st(...(col||BLK));
-    const ty = y + h*0.65;   // vertically centred text baseline
-    if(aln==='left')        doc.text(String(txt), x+4,     ty);
-    else if(aln==='center') doc.text(String(txt), x+w/2,   ty, {align:'center'});
-    else                    doc.text(String(txt), x+w-4,   ty, {align:'right'});
+    const ty=y+h*0.65;
+    if(aln==='left')        doc.text(String(txt),x+4,ty);
+    else if(aln==='center') doc.text(String(txt),x+w/2,ty,{align:'center'});
+    else                    doc.text(String(txt),x+w-4,ty,{align:'right'});
   };
 
-  // ── LOGO (top-left) ─────────────────────────────── y: 20–120
-  try { doc.addImage(LOGO_DATA_URI,'PNG', PL, 20, 100, 100, undefined,'FAST'); } catch(e){}
+  // ── LOGO ──────────────────────────────────────────── y: 20
+  try { doc.addImage(LOGO_DATA_URI,'PNG',PL,20,100,100,undefined,'FAST'); } catch(e){}
 
-  // ── QUOTE heading (top-right) ────────────────────── y: ~55
+  // ── QUOTE heading ─────────────────────────────────── y: 62
   doc.setFont('helvetica','bold'); doc.setFontSize(48); st(...LGR);
-  doc.text('QUOTE', PR, 62, {align:'right'});
+  doc.text('QUOTE',PR,62,{align:'right'});
 
-  // ── Company address (below logo) ─────────────────── y: 132+
+  // ── Company address ───────────────────────────────── y: 132
   doc.setFont('helvetica','normal'); doc.setFontSize(8.5); st(...BLK);
   ['33 Osborn Ave','Brantford, ON, CA, N3T 6R1','(647) 709-4052','www.khairgroup.ca']
-    .forEach((line,i) => doc.text(line, PL, 132 + i*13));
+    .forEach((line,i) => doc.text(line,PL,132+i*13));
 
-  // ── META BOX (right side) ────────────────────────── y: 62–120
-  const mx=326, my=62, rmh=17, pad=7;
-  const bh = 3*rmh + pad*2;   // box height
-  sf(...VLG); doc.rect(mx, my, PR-mx, bh, 'F');
-  ss(...LGR); doc.setLineWidth(0.5); doc.rect(mx, my, PR-mx, bh, 'S');
-  sf(...RED); doc.rect(mx, my, 3, bh, 'F');
-  [['DATE:', dateFmt(today)], ['QUOTE #:', ref], ['VALID TILL:', dateFmt(validUntil)]]
-    .forEach(([lbl,val],i) => {
-      const ry = my + pad + i*rmh + rmh*0.65;
-      doc.setFont('helvetica','bold');   doc.setFontSize(8.5); st(...BLK); doc.text(lbl, mx+10, ry);
-      doc.setFont('helvetica','normal'); doc.text(val, PR-6, ry, {align:'right'});
+  // ── META BOX ─────────────────────────────────────── y: 62
+  const mx=326,my=62,rmh=17,pad=7,bh=3*rmh+pad*2;
+  sf(...VLG); doc.rect(mx,my,PR-mx,bh,'F');
+  ss(...LGR); doc.setLineWidth(0.5); doc.rect(mx,my,PR-mx,bh,'S');
+  sf(...RED); doc.rect(mx,my,3,bh,'F');
+  [['DATE:',dateFmt(today)],['QUOTE #:',ref],['VALID TILL:',dateFmt(validUntil)]]
+    .forEach(([lbl,val],i)=>{
+      const ry=my+pad+i*rmh+rmh*0.65;
+      doc.setFont('helvetica','bold');   doc.setFontSize(8.5); st(...BLK); doc.text(lbl,mx+10,ry);
+      doc.setFont('helvetica','normal'); doc.text(val,PR-6,ry,{align:'right'});
     });
 
-  // ── CLIENT BLOCK (right side, below meta box) ────── y: 138+
-  const cx=326, vx=396;
-  let clY = my + bh + 22;
-  const cAddr    = g('addrB').value  || '—';
-  const cContact = custPhone || custEmail || '—';
-  [['Name', custName],['Address', cAddr],['Contact', cContact]]
-    .forEach(([lbl,val]) => {
-      doc.setFont('helvetica','bold');   doc.setFontSize(8.5); st(...BLK); doc.text(lbl, cx, clY);
-      doc.setFont('helvetica','normal');
-      const lines = doc.splitTextToSize(val, PR-vx);
-      lines.forEach((ln,i) => doc.text(ln, vx, clY + i*13));
-      clY += 14 * Math.max(1, lines.length);
-    });
+  // ── CLIENT BLOCK ─────────────────────────────────── y: 138
+  const cx=326,vx=396;
+  let clY=my+bh+22;
+  const clientRows=[['Name',custName]];
+  if(custAddr) clientRows.push(['Address',custAddr]);
+  clientRows.push(['Contact',custPhone||custEmail||'—']);
+  clientRows.forEach(([lbl,val])=>{
+    doc.setFont('helvetica','bold');   doc.setFontSize(8.5); st(...BLK); doc.text(lbl,cx,clY);
+    doc.setFont('helvetica','normal');
+    const lines=doc.splitTextToSize(val,PR-vx);
+    lines.forEach((ln,i)=>doc.text(ln,vx,clY+i*13));
+    clY+=14*Math.max(1,lines.length);
+  });
 
-  // ── RED SEPARATOR ───────────────────────────────── y: 230
-  const sepY = 232;
-  ss(...RED); doc.setLineWidth(1.0); doc.line(PL, sepY, PR, sepY);
+  // ── RED SEPARATOR ────────────────────────────────── y: 232
+  const sepY=232;
+  ss(...RED); doc.setLineWidth(1.0); doc.line(PL,sepY,PR,sepY);
 
-  // ── 4-COLUMN TABLE ──────────────────────────────── y: 236+
-  const TT = 238;                             // table top
-  const cX = [PL, 355, 440, 492, PR];
-  const cW = [cX[1]-cX[0], cX[2]-cX[1], cX[3]-cX[2], cX[4]-cX[3]];
-  const hdrs = ['DESCRIPTION','PRICE','QTY','AMOUNT'];
-  const alns = ['left','center','center','right'];
-  const RH=20, HH=22, NR=10;
+  // ── 4-COLUMN TABLE ───────────────────────────────── y: 238
+  const TT=238;
+  const cX=[PL,355,440,492,PR];
+  const cW=[cX[1]-cX[0],cX[2]-cX[1],cX[3]-cX[2],cX[4]-cX[3]];
+  const hdrs=['DESCRIPTION','PRICE','QTY','AMOUNT'];
+  const alns=['left','center','center','right'];
+  const RH=20,HH=22,NR=10;
 
-  // Header row
-  hdrs.forEach((h,i) => { cell(cX[i], TT, cW[i], HH, LGR); ctxt(h, cX[i], cW[i], TT, HH, alns[i], true, 8); });
+  // Red separator above table
+  hdrs.forEach((h,i)=>{ cell(cX[i],TT,cW[i],HH,LGR); ctxt(h,cX[i],cW[i],TT,HH,alns[i],true,8); });
 
-  // Build line items
+  // Build items — route on its OWN line, surcharges below
+  const addrA = g('addrA').value || 'Location A';
+  const addrB = g('addrB').value || 'Location B';
   const delivAmt = q.base + q.distCost + q.fuelCostTotal + q.labourCost;
+  const routeDesc = 'Pickup & Delivery (' + q.km.toFixed(0) + ' km)';
+  const fromDesc  = 'From: ' + addrA;
+  const toDesc    = 'To:   ' + addrB;
+
   const items = [
-    { desc: 'Pickup & Delivery \u2014 ' + (g('addrA').value||'Location A') + ' to ' + (g('addrB').value||'Location B') + ' (' + q.km.toFixed(0) + ' km)',
-      price: fmt(delivAmt), qty:'1', amount: fmt(delivAmt) },
-    ...q.surchargeItems.map(([l,a]) => ({ desc:l+' Surcharge', price:fmt(a), qty:'1', amount:fmt(a) }))
+    { desc: routeDesc,  sub: fromDesc + '  \u2192  ' + toDesc, price: fmt(delivAmt), qty:'1', amount: fmt(delivAmt) },
+    ...q.surchargeItems.map(([l,a])=>({ desc:l+' Surcharge', sub:'', price:fmt(a), qty:'1', amount:fmt(a) }))
   ];
 
-  // Data rows
+  let rowY = TT + HH;
   for(let r=0; r<NR; r++){
-    const ry = TT + HH + r*RH;
-    cW.forEach((_,i) => cell(cX[i], ry, cW[i], RH));
-    if(r < items.length){
-      const it = items[r];
-      [it.desc, it.price, it.qty, it.amount].forEach((v,i) => ctxt(v, cX[i], cW[i], ry, RH, alns[i]));
+    const yt=rowY;
+    const item=items[r];
+    // Row height: if has sub-line, use double height
+    const hasSubLine = item && item.sub;
+    const thisRH = hasSubLine ? RH+10 : RH;
+    cW.forEach((_,i)=>cell(cX[i],yt,cW[i],thisRH));
+    if(item){
+      // Description column — main text + sub-line
+      doc.setFont('helvetica','normal'); doc.setFontSize(8.5); st(...BLK);
+      doc.text(item.desc, cX[0]+4, yt+thisRH*0.45);
+      if(hasSubLine){
+        doc.setFontSize(7.5); st(...MGR);
+        doc.text(item.sub, cX[0]+4, yt+thisRH*0.75);
+      }
+      // Other columns
+      [item.price, item.qty, item.amount].forEach((val,i)=>
+        ctxt(val, cX[i+1], cW[i+1], yt, thisRH, alns[i+1])
+      );
     }
+    rowY += thisRH;
+    // Fill remaining empty rows if r < NR-1 and no more items
+    if(r >= items.length && r < NR-1) rowY += 0; // normal row already drawn
+  }
+  // Fill any remaining rows that weren't drawn yet
+  while(rowY < TT + HH + NR*RH + 20){
+    cW.forEach((_,i)=>cell(cX[i],rowY,cW[i],RH));
+    rowY+=RH;
   }
 
-  // ── TOTALS ──────────────────────────────────────────────────
-  const TB = TT + HH + NR*RH;
-  // HST calculated on the pre-margin subtotal after discount
-  const preMargin = q.afterDisc !== undefined ? q.afterDisc : q.subtotal;
-  const hst = preMargin * 0.13;
-  const finalAmt = preMargin + hst;
-  [['TOTAL', fmt(q.total), false], ['DISC.', q.discAmt > 0 ? '- ' + fmt(q.discAmt) : '$0.00', false],
-   ['HST/GST', fmt(hst), false],   ['FINAL', fmt(finalAmt), true]]
-    .forEach(([lbl,val,fin],i) => {
-      const ry = TB + i*RH;
-      const tc = fin ? WHT : BLK;
-      cell(cX[2], ry, cW[2], RH, fin?RED:LGR);
-      cell(cX[3], ry, cW[3], RH, fin?RED:null);
-      ctxt(lbl, cX[2], cW[2], ry, RH, 'center', true,  8.5, tc);
-      ctxt(val, cX[3], cW[3], ry, RH, 'right',  fin,   8.5, tc);
+  // ── TOTALS ─────────────────────────────────────────
+  const TB=rowY;
+  const hstPct = q.hstExempt ? 0 : 13;
+  const hstLabel = 'HST/GST (' + hstPct + '%)';
+
+  [['TOTAL',     fmt(q.subtotal),  false],
+   ['DISC.',     q.discAmt>0 ? '- '+fmt(q.discAmt) : '$0.00', false],
+   [hstLabel,   fmt(q.hstAmt),    false],
+   ['FINAL',    fmt(q.total),     true]]
+    .forEach(([lbl,val,fin],i)=>{
+      const yt=TB+i*RH; const tc=fin?WHT:BLK;
+      cell(cX[2],yt,cW[2],RH,fin?RED:LGR);
+      cell(cX[3],yt,cW[3],RH,fin?RED:null);
+      ctxt(lbl,cX[2],cW[2],yt,RH,'center',true,8.5,tc);
+      ctxt(val,cX[3],cW[3],yt,RH,'right',fin,8.5,tc);
     });
 
-  // ── TERMS & CONDITIONS ──────────────────────────────────────
-  let tcY = TB + 4*RH + 18;
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); st(...BLK);
-  doc.text('TERMS & CONDITIONS', PL, tcY); tcY += 13;
+  // ── CLOSING ────────────────────────────────────────
+  let tcY=TB+4*RH+18;
+  doc.setFont('helvetica','bolditalic'); doc.setFontSize(9); st(...RED);
+  doc.text('We look forward to your business!',306,tcY,{align:'center'});
+  tcY+=16;
 
-  const terms = [
-    'Prices valid until ' + dateFmt(validUntil) + '.',
+  // ── TERMS ──────────────────────────────────────────
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); st(...BLK);
+  doc.text('TERMS & CONDITIONS',PL,tcY); tcY+=13;
+  const terms=[
+    'Prices valid until '+dateFmt(validUntil)+'.',
     'A 50% deposit is required to confirm and schedule the delivery.',
     'The remaining balance is due upon successful delivery.',
     'Fuel surcharges are estimated and may vary slightly at time of delivery.',
@@ -1184,24 +1253,20 @@ function generatePDF() {
     'All quotes are in Canadian Dollars (CAD) and include applicable surcharges as itemized above.',
   ];
   doc.setFont('helvetica','normal'); doc.setFontSize(7.5); st(...DGR);
-  terms.forEach(t => {
-    doc.splitTextToSize('• ' + t, cX[2]-PL-8).forEach(ln => {
-      if(tcY < PB){ doc.text(ln, PL, tcY); tcY += 10; }
+  terms.forEach(t=>{
+    doc.splitTextToSize('• '+t,cX[2]-PL-8).forEach(ln=>{
+      if(tcY<PB){ doc.text(ln,PL,tcY); tcY+=10; }
     });
-    tcY += 1;
+    tcY+=1;
   });
 
-  // ── CLOSING LINE ────────────────────────────────────────────────
-  doc.setFont('helvetica','bolditalic'); doc.setFontSize(9); st(...RED);
-  doc.text('We look forward to your business!', 306, tcY + 10, {align:'center'});
-
-  // ── FOOTER ──────────────────────────────────────────────────
-  ss(...RED); doc.setLineWidth(0.8); doc.line(PL, 758, PR, 758);
+  // ── FOOTER ─────────────────────────────────────────
+  ss(...RED); doc.setLineWidth(0.8); doc.line(PL,758,PR,758);
   doc.setFont('helvetica','normal'); doc.setFontSize(7); st(...MGR);
-  doc.text(company + '  \u00b7  33 Osborn Ave, Brantford, ON  \u00b7  (647) 709-4052  \u00b7  www.khairgroup.ca',
-           306, 770, {align:'center'});
+  doc.text(company+'  \u00b7  33 Osborn Ave, Brantford, ON  \u00b7  (647) 709-4052  \u00b7  www.khairgroup.ca',
+           306,770,{align:'center'});
 
-  doc.save('KG_Quote_' + ref + '.pdf');
+  doc.save('KG_Quote_'+ref+'.pdf');
   const t=g('toast'); t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000);
 }
 
@@ -1317,26 +1382,25 @@ setInterval(loadInbox, 5000); // refresh badge every 5s
 
 // ── EMAIL FUNCTIONS ───────────────────────────────────────────────────
 function buildEmailBody() {
-  const q       = calcQuote();
-  const hst     = q.total * 0.13;
-  const finalAmt = q.total + hst;
-  const name    = g('custName').value    || 'Valued Customer';
-  const ref     = g('quoteRef').value    || generateQuoteRef();
-  const addr_a  = g('addrA').value       || 'pickup location';
-  const addr_b  = g('addrB').value       || 'dropoff location';
-  const today   = new Date();
-  const validUntil = new Date(today.getTime() + v('validDays') * 86400000);
-  const dateFmt = d => d.toLocaleDateString('en-CA', { year:'numeric', month:'long', day:'numeric' });
-  const company = g('companyName').value || 'Khair Group';
-  const phone   = g('companyPhone').value || '(647) 709-4052';
-  const emailAddr = g('companyEmail').value || 'quotes@khairgroup.ca';
+  const q         = calcQuote();
+  const ref       = g('quoteRef').value    || generateQuoteRef();
+  const today     = new Date();
+  const validUntil= new Date(today.getTime() + v('validDays') * 86400000);
+  const dateFmt   = d => d.toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
+  const company   = g('companyName').value || 'Khair Group';
+  const phone     = g('companyPhone').value|| '(647) 709-4052';
+  const emailAddr = g('companyEmail').value|| 'quotes@khairgroup.ca';
+  const custName  = g('custName').value    || 'Valued Customer';
+  const addrA     = g('addrA').value       || 'pickup location';
+  const addrB     = g('addrB').value       || 'dropoff location';
+  const hstPct    = q.hstExempt ? '0' : '13';
 
   const surchargeLines = q.surchargeItems.length > 0
-    ? q.surchargeItems.map(function(item){ return item[0].padEnd(18) + '  ' + fmt(item[1]); }).join('\n')
+    ? q.surchargeItems.map(function(item){ return item[0].padEnd(18)+'  '+fmt(item[1]); }).join('\n')
     : '';
 
   const lines = [
-    'Dear ' + name + ',',
+    'Dear ' + custName + ',',
     '',
     'Thank you for choosing Khair Group. Please find below your delivery quote as requested.',
     '',
@@ -1345,19 +1409,23 @@ function buildEmailBody() {
     'VALID UNTIL:      ' + dateFmt(validUntil),
     '',
     'DELIVERY DETAILS',
-    'Pickup:   ' + addr_a,
-    'Dropoff:  ' + addr_b,
+    'From:     ' + addrA,
+    'To:       ' + addrB,
     '',
     'COST SUMMARY',
     'Delivery Charge:  ' + fmt(q.base + q.distCost + q.fuelCostTotal + q.labourCost),
   ];
 
-  if (surchargeLines) lines.push(surchargeLines);
+  if(surchargeLines) lines.push(surchargeLines);
+
+  if(q.discAmt > 0) lines.push('Discount:         - ' + fmt(q.discAmt));
 
   lines.push(
-    'Subtotal:         ' + fmt(q.total),
-    'HST/GST (13%):    ' + fmt(hst),
-    'TOTAL:            ' + fmt(finalAmt),
+    'Subtotal:         ' + fmt(q.afterDisc),
+    'Margin (' + q.marginPct + '%):     ' + fmt(q.marginAmt),
+    'Pre-tax Total:    ' + fmt(q.preHst),
+    'HST/GST (' + hstPct + '%):    ' + fmt(q.hstAmt),
+    'TOTAL (CAD):      ' + fmt(q.total),
     '',
     'The full itemised quote is attached as a PDF for your records.',
     '',
