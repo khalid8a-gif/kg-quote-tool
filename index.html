@@ -1092,7 +1092,7 @@ function generatePDF() {
   const custName  = g('custName').value    || 'Valued Customer';
   const custPhone = g('custPhone').value   || '';
   const custEmail = g('custEmail').value   || '';
-  const custAddr  = g('custAddr')  ? (g('custAddr').value  || '') : '';
+  const custAddr  = g('custAddr') ? (g('custAddr').value || '') : '';
 
   const doc = new jsPDF({ unit:'pt', format:'letter', orientation:'portrait' });
   const PL=62, PR=590, PB=748;
@@ -1117,19 +1117,19 @@ function generatePDF() {
     else                    doc.text(String(txt),x+w-4,ty,{align:'right'});
   };
 
-  // ── LOGO ──────────────────────────────────────────── y: 20
+  // ── LOGO ──────────────────────────────────────────
   try { doc.addImage(LOGO_DATA_URI,'PNG',PL,20,100,100,undefined,'FAST'); } catch(e){}
 
-  // ── QUOTE heading ─────────────────────────────────── y: 62
+  // ── QUOTE heading ─────────────────────────────────
   doc.setFont('helvetica','bold'); doc.setFontSize(48); st(...LGR);
   doc.text('QUOTE',PR,62,{align:'right'});
 
-  // ── Company address ───────────────────────────────── y: 132
+  // ── Company address ───────────────────────────────
   doc.setFont('helvetica','normal'); doc.setFontSize(8.5); st(...BLK);
   ['33 Osborn Ave','Brantford, ON, CA, N3T 6R1','(647) 709-4052','www.khairgroup.ca']
     .forEach((line,i) => doc.text(line,PL,132+i*13));
 
-  // ── META BOX ─────────────────────────────────────── y: 62
+  // ── META BOX ─────────────────────────────────────
   const mx=326,my=62,rmh=17,pad=7,bh=3*rmh+pad*2;
   sf(...VLG); doc.rect(mx,my,PR-mx,bh,'F');
   ss(...LGR); doc.setLineWidth(0.5); doc.rect(mx,my,PR-mx,bh,'S');
@@ -1141,7 +1141,7 @@ function generatePDF() {
       doc.setFont('helvetica','normal'); doc.text(val,PR-6,ry,{align:'right'});
     });
 
-  // ── CLIENT BLOCK ─────────────────────────────────── y: 138
+  // ── CLIENT BLOCK ─────────────────────────────────
   const cx=326,vx=396;
   let clY=my+bh+22;
   const clientRows=[['Name',custName]];
@@ -1155,91 +1155,130 @@ function generatePDF() {
     clY+=14*Math.max(1,lines.length);
   });
 
-  // ── RED SEPARATOR ────────────────────────────────── y: 232
-  const sepY=232;
-  ss(...RED); doc.setLineWidth(1.0); doc.line(PL,sepY,PR,sepY);
+  // ── RED SEPARATOR ─────────────────────────────────
+  ss(...RED); doc.setLineWidth(1.0); doc.line(PL,232,PR,232);
 
-  // ── 4-COLUMN TABLE ───────────────────────────────── y: 238
+  // ── 4-COLUMN TABLE ───────────────────────────────
+  // Columns: DESCRIPTION | PRICE | QTY | AMOUNT
+  // TOTALS label column spans col[2]+col[3] combined width
+  // so HST/GST fits. We widen col[2] and narrow col[3] slightly.
   const TT=238;
-  const cX=[PL,355,440,492,PR];
-  const cW=[cX[1]-cX[0],cX[2]-cX[1],cX[3]-cX[2],cX[4]-cX[3]];
+  const cX=[PL, 330, 424, 492, PR];  // col start x positions
+  const cW=[cX[1]-cX[0], cX[2]-cX[1], cX[3]-cX[2], cX[4]-cX[3]];
+  // cW[2]=68pt for label — wide enough for "HST/GST (13%)"
   const hdrs=['DESCRIPTION','PRICE','QTY','AMOUNT'];
   const alns=['left','center','center','right'];
-  const RH=20,HH=22,NR=10;
+  const RH=20, HH=22, NR=10;
 
-  // Red separator above table
+  // Header
   hdrs.forEach((h,i)=>{ cell(cX[i],TT,cW[i],HH,LGR); ctxt(h,cX[i],cW[i],TT,HH,alns[i],true,8); });
 
-  // Build items — route on its OWN line, surcharges below
+  // Build items
   const addrA = g('addrA').value || 'Location A';
   const addrB = g('addrB').value || 'Location B';
   const delivAmt = q.base + q.distCost + q.fuelCostTotal + q.labourCost;
-  const routeDesc = 'Pickup & Delivery (' + q.km.toFixed(0) + ' km)';
-  const fromDesc  = 'From: ' + addrA;
-  const toDesc    = 'To:   ' + addrB;
+
+  // Route item: description + TWO sub-lines (From / To) each on own line
+  const descColW = cX[1] - cX[0] - 8; // usable width in description col
+  const routeTitle = 'Pickup & Delivery (' + q.km.toFixed(0) + ' km)';
+  const fromLine   = 'From: ' + addrA;
+  const toLine     = 'To:   ' + addrB;
+
+  // Wrap each sub-line independently within description column
+  const fromWrapped = doc.setFontSize(7.5) || doc.splitTextToSize(fromLine, descColW);
+  const toWrapped   = doc.splitTextToSize(toLine,   descColW);
+  const subLineCount = fromWrapped.length + toWrapped.length;
+  const routeRH = RH + subLineCount * 9 + 4; // dynamic height
 
   const items = [
-    { desc: routeDesc,  sub: fromDesc + '  \u2192  ' + toDesc, price: fmt(delivAmt), qty:'1', amount: fmt(delivAmt) },
-    ...q.surchargeItems.map(([l,a])=>({ desc:l+' Surcharge', sub:'', price:fmt(a), qty:'1', amount:fmt(a) }))
+    { isRoute: true, desc: routeTitle,
+      fromLines: fromWrapped, toLines: toWrapped,
+      price: fmt(delivAmt), qty:'1', amount: fmt(delivAmt), height: routeRH },
+    ...q.surchargeItems.map(([l,a])=>({
+      isRoute:false, desc:l+' Surcharge', fromLines:[], toLines:[],
+      price:fmt(a), qty:'1', amount:fmt(a), height: RH
+    }))
   ];
 
+  // Draw rows
   let rowY = TT + HH;
+  let drawnRows = 0;
+
   for(let r=0; r<NR; r++){
-    const yt=rowY;
-    const item=items[r];
-    // Row height: if has sub-line, use double height
-    const hasSubLine = item && item.sub;
-    const thisRH = hasSubLine ? RH+10 : RH;
-    cW.forEach((_,i)=>cell(cX[i],yt,cW[i],thisRH));
+    const item = items[r];
+    const thisH = item ? item.height : RH;
+
+    // Draw all 4 column borders for this row
+    cW.forEach((_,i) => cell(cX[i], rowY, cW[i], thisH));
+
     if(item){
-      // Description column — main text + sub-line
+      // Description col: title bold, sub-lines small grey
       doc.setFont('helvetica','normal'); doc.setFontSize(8.5); st(...BLK);
-      doc.text(item.desc, cX[0]+4, yt+thisRH*0.45);
-      if(hasSubLine){
+      doc.text(item.desc, cX[0]+4, rowY + 13);
+
+      if(item.isRoute){
         doc.setFontSize(7.5); st(...MGR);
-        doc.text(item.sub, cX[0]+4, yt+thisRH*0.75);
+        let subY = rowY + 23;
+        item.fromLines.forEach(ln => { doc.text(ln, cX[0]+4, subY); subY+=9; });
+        item.toLines.forEach(  ln => { doc.text(ln, cX[0]+4, subY); subY+=9; });
       }
-      // Other columns
-      [item.price, item.qty, item.amount].forEach((val,i)=>
-        ctxt(val, cX[i+1], cW[i+1], yt, thisRH, alns[i+1])
-      );
+
+      // Price, Qty, Amount cols
+      [[item.price,'center'],[item.qty,'center'],[item.amount,'right']]
+        .forEach(([val,aln],ci)=>{
+          doc.setFont('helvetica','normal'); doc.setFontSize(8.5); st(...BLK);
+          const colIdx = ci+1;
+          const ty = rowY + thisH * 0.65;
+          if(aln==='center') doc.text(val, cX[colIdx]+cW[colIdx]/2, ty, {align:'center'});
+          else               doc.text(val, cX[colIdx]+cW[colIdx]-4, ty, {align:'right'});
+        });
     }
-    rowY += thisRH;
-    // Fill remaining empty rows if r < NR-1 and no more items
-    if(r >= items.length && r < NR-1) rowY += 0; // normal row already drawn
-  }
-  // Fill any remaining rows that weren't drawn yet
-  while(rowY < TT + HH + NR*RH + 20){
-    cW.forEach((_,i)=>cell(cX[i],rowY,cW[i],RH));
-    rowY+=RH;
+
+    rowY += thisH;
+    drawnRows++;
   }
 
-  // ── TOTALS ─────────────────────────────────────────
-  const TB=rowY;
-  const hstPct = q.hstExempt ? 0 : 13;
+  // Fill remaining empty rows if items < NR
+  while(drawnRows < NR){
+    cW.forEach((_,i) => cell(cX[i], rowY, cW[i], RH));
+    rowY += RH;
+    drawnRows++;
+  }
+
+  // ── TOTALS ───────────────────────────────────────
+  // Label col = cX[2], width = cW[2] (68pt) — fits "HST/GST (13%)"
+  // Value col = cX[3], width = cW[3]
+  const TB = rowY;
+  const hstPct   = q.hstExempt ? 0 : 13;
   const hstLabel = 'HST/GST (' + hstPct + '%)';
 
-  [['TOTAL',     fmt(q.subtotal),  false],
-   ['DISC.',     q.discAmt>0 ? '- '+fmt(q.discAmt) : '$0.00', false],
-   [hstLabel,   fmt(q.hstAmt),    false],
-   ['FINAL',    fmt(q.total),     true]]
+  [['TOTAL',   fmt(q.subtotal), false],
+   ['DISC.',   q.discAmt>0 ? '- '+fmt(q.discAmt) : '$0.00', false],
+   [hstLabel,  fmt(q.hstAmt),  false],
+   ['FINAL',   fmt(q.total),   true]]
     .forEach(([lbl,val,fin],i)=>{
       const yt=TB+i*RH; const tc=fin?WHT:BLK;
+      // Label cell — wider to fit HST text
       cell(cX[2],yt,cW[2],RH,fin?RED:LGR);
+      // Value cell
       cell(cX[3],yt,cW[3],RH,fin?RED:null);
-      ctxt(lbl,cX[2],cW[2],yt,RH,'center',true,8.5,tc);
-      ctxt(val,cX[3],cW[3],yt,RH,'right',fin,8.5,tc);
+      // Label text — reduce font size slightly so HST/GST (13%) fits
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); st(...tc);
+      doc.text(lbl, cX[2]+cW[2]/2, yt+RH*0.65, {align:'center'});
+      // Value text
+      doc.setFont('helvetica', fin?'bold':'normal'); doc.setFontSize(8.5); st(...tc);
+      doc.text(val, cX[3]+cW[3]-4, yt+RH*0.65, {align:'right'});
     });
 
-  // ── CLOSING ────────────────────────────────────────
-  let tcY=TB+4*RH+18;
+  // ── CLOSING LINE ─────────────────────────────────
+  let tcY = TB + 4*RH + 16;
   doc.setFont('helvetica','bolditalic'); doc.setFontSize(9); st(...RED);
-  doc.text('We look forward to your business!',306,tcY,{align:'center'});
-  tcY+=16;
+  doc.text('We look forward to your business!', 306, tcY, {align:'center'});
+  tcY += 16;
 
-  // ── TERMS ──────────────────────────────────────────
+  // ── TERMS ────────────────────────────────────────
   doc.setFont('helvetica','bold'); doc.setFontSize(9); st(...BLK);
-  doc.text('TERMS & CONDITIONS',PL,tcY); tcY+=13;
+  doc.text('TERMS & CONDITIONS', PL, tcY); tcY+=13;
   const terms=[
     'Prices valid until '+dateFmt(validUntil)+'.',
     'A 50% deposit is required to confirm and schedule the delivery.',
@@ -1254,13 +1293,13 @@ function generatePDF() {
   ];
   doc.setFont('helvetica','normal'); doc.setFontSize(7.5); st(...DGR);
   terms.forEach(t=>{
-    doc.splitTextToSize('• '+t,cX[2]-PL-8).forEach(ln=>{
+    doc.splitTextToSize('• '+t, cX[2]-PL-8).forEach(ln=>{
       if(tcY<PB){ doc.text(ln,PL,tcY); tcY+=10; }
     });
     tcY+=1;
   });
 
-  // ── FOOTER ─────────────────────────────────────────
+  // ── FOOTER ───────────────────────────────────────
   ss(...RED); doc.setLineWidth(0.8); doc.line(PL,758,PR,758);
   doc.setFont('helvetica','normal'); doc.setFontSize(7); st(...MGR);
   doc.text(company+'  \u00b7  33 Osborn Ave, Brantford, ON  \u00b7  (647) 709-4052  \u00b7  www.khairgroup.ca',
@@ -1422,8 +1461,8 @@ function buildEmailBody() {
 
   lines.push(
     'Subtotal:         ' + fmt(q.afterDisc),
-    'Margin (' + q.marginPct + '%):     ' + fmt(q.marginAmt),
-    'Pre-tax Total:    ' + fmt(q.preHst),
+    // margin hidden from customer
+    'Subtotal (after discount): ' + fmt(q.preHst),
     'HST/GST (' + hstPct + '%):    ' + fmt(q.hstAmt),
     'TOTAL (CAD):      ' + fmt(q.total),
     '',
