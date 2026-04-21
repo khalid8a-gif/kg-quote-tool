@@ -1233,198 +1233,147 @@ function generatePDF() {
 
   const company   = g('companyName').value || 'Khair Group';
   const custName  = g('custName').value    || 'Valued Customer';
-  const custPhone = g('custPhone').value   || '';
+  const custPhone = (g('custPhone').value  || '').replace(/\s+/g,' ').trim();
   const custEmail = g('custEmail').value   || '';
-  const custAddr  = g('custAddr') ? (g('custAddr').value || '') : '';
+  const custAddr  = g('custAddr') ? (g('custAddr').value||'') : '';
 
   const doc = new jsPDF({ unit:'pt', format:'letter', orientation:'portrait' });
   const PL=62, PR=590, PB=748;
 
-  const sf = (r,g2,b) => doc.setFillColor(r,g2,b);
-  const ss = (r,g2,b) => doc.setDrawColor(r,g2,b);
-  const st = (r,g2,b) => doc.setTextColor(r,g2,b);
-
+  const sf=(r,g2,b)=>doc.setFillColor(r,g2,b);
+  const ss=(r,g2,b)=>doc.setDrawColor(r,g2,b);
+  const st=(r,g2,b)=>doc.setTextColor(r,g2,b);
   const RED=[204,31,31],BLK=[15,15,15],MGR=[120,120,120],
-        DGR=[50,50,50], LGR=[220,220,220],WHT=[255,255,255],VLG=[245,245,245];
+        DGR=[50,50,50],LGR=[220,220,220],WHT=[255,255,255],VLG=[245,245,245];
 
-  const cell = (x,y,w,h,fill) => {
-    if(fill){ sf(...fill); doc.rect(x,y,w,h,'F'); }
-    ss(...LGR); doc.setLineWidth(0.4); doc.rect(x,y,w,h,'S');
+  const cell=(x,y,w,h,fill)=>{
+    if(fill){sf(...fill);doc.rect(x,y,w,h,'F');}
+    ss(...LGR);doc.setLineWidth(0.4);doc.rect(x,y,w,h,'S');
   };
-  const ctxt = (txt,x,w,y,h,aln,bold,sz,col) => {
+  const ctxt=(txt,x,w,y,h,aln,bold,sz,col)=>{
     doc.setFont('helvetica',bold?'bold':'normal');
-    doc.setFontSize(sz||8.5); st(...(col||BLK));
+    doc.setFontSize(sz||8.5);st(...(col||BLK));
     const ty=y+h*0.65;
-    if(aln==='left')        doc.text(String(txt),x+4,ty);
-    else if(aln==='center') doc.text(String(txt),x+w/2,ty,{align:'center'});
-    else                    doc.text(String(txt),x+w-4,ty,{align:'right'});
+    if(aln==='left')       doc.text(String(txt),x+4,ty);
+    else if(aln==='center')   doc.text(String(txt),x+w/2,ty,{align:'center'});
+    else                   doc.text(String(txt),x+w-4,ty,{align:'right'});
   };
 
-  // ── LOGO ──────────────────────────────────────────
-  try { doc.addImage(LOGO_DATA_URI,'PNG',PL,20,100,100,undefined,'FAST'); } catch(e){}
+  // LOGO
+  try{doc.addImage(LOGO_DATA_URI,'PNG',PL,20,100,100,undefined,'FAST');}catch(e){}
 
-  // ── QUOTE heading ─────────────────────────────────
-  doc.setFont('helvetica','bold'); doc.setFontSize(48); st(...LGR);
+  // QUOTE heading
+  doc.setFont('helvetica','bold');doc.setFontSize(48);st(...LGR);
   doc.text('QUOTE',PR,62,{align:'right'});
 
-  // ── Company address ───────────────────────────────
-  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); st(...BLK);
+  // Company address
+  doc.setFont('helvetica','normal');doc.setFontSize(8.5);st(...BLK);
   ['33 Osborn Ave','Brantford, ON, CA, N3T 6R1','(647) 709-4052','www.khairgroup.ca']
-    .forEach((line,i) => doc.text(line,PL,132+i*13));
+    .forEach((line,i)=>doc.text(line,PL,132+i*13));
 
-  // ── META BOX ─────────────────────────────────────
+  // META BOX
   const mx=326,my=62,rmh=17,pad=7,bh=3*rmh+pad*2;
-  sf(...VLG); doc.rect(mx,my,PR-mx,bh,'F');
-  ss(...LGR); doc.setLineWidth(0.5); doc.rect(mx,my,PR-mx,bh,'S');
-  sf(...RED); doc.rect(mx,my,3,bh,'F');
+  sf(...VLG);doc.rect(mx,my,PR-mx,bh,'F');
+  ss(...LGR);doc.setLineWidth(0.5);doc.rect(mx,my,PR-mx,bh,'S');
+  sf(...RED);doc.rect(mx,my,3,bh,'F');
   [['DATE:',dateFmt(today)],['QUOTE #:',ref],['VALID TILL:',dateFmt(validUntil)]]
     .forEach(([lbl,val],i)=>{
       const ry=my+pad+i*rmh+rmh*0.65;
-      doc.setFont('helvetica','bold');   doc.setFontSize(8.5); st(...BLK); doc.text(lbl,mx+10,ry);
-      doc.setFont('helvetica','normal'); doc.text(val,PR-6,ry,{align:'right'});
+      doc.setFont('helvetica','bold');doc.setFontSize(8.5);st(...BLK);doc.text(lbl,mx+10,ry);
+      doc.setFont('helvetica','normal');doc.text(val,PR-6,ry,{align:'right'});
     });
 
-  // ── CLIENT BLOCK ─────────────────────────────────
+  // CLIENT BLOCK
   const cx=326,vx=396;
   let clY=my+bh+22;
+  const contact = custPhone || custEmail || '\u2014';
   const clientRows=[['Name',custName]];
   if(custAddr) clientRows.push(['Address',custAddr]);
-  clientRows.push(['Contact',custPhone||custEmail||'—']);
+  clientRows.push(['Contact',contact]);
   clientRows.forEach(([lbl,val])=>{
-    doc.setFont('helvetica','bold');   doc.setFontSize(8.5); st(...BLK); doc.text(lbl,cx,clY);
+    doc.setFont('helvetica','bold');doc.setFontSize(8.5);st(...BLK);doc.text(lbl,cx,clY);
     doc.setFont('helvetica','normal');
     const lines=doc.splitTextToSize(val,PR-vx);
     lines.forEach((ln,i)=>doc.text(ln,vx,clY+i*13));
     clY+=14*Math.max(1,lines.length);
   });
 
-  // ── RED SEPARATOR ─────────────────────────────────
-  ss(...RED); doc.setLineWidth(1.0); doc.line(PL,232,PR,232);
-
-  // ── 4-COLUMN TABLE ───────────────────────────────
-  // Columns: DESCRIPTION | PRICE | QTY | AMOUNT
-  // TOTALS label column spans col[2]+col[3] combined width
-  // so HST/GST fits. We widen col[2] and narrow col[3] slightly.
+  // TABLE — no red separator line above
   const TT=238;
-  const cX=[PL, 330, 424, 492, PR];  // col start x positions
-  const cW=[cX[1]-cX[0], cX[2]-cX[1], cX[3]-cX[2], cX[4]-cX[3]];
-  // cW[2]=68pt for label — wide enough for "HST/GST (13%)"
+  const cX=[PL,330,424,492,PR];
+  const cW=[cX[1]-cX[0],cX[2]-cX[1],cX[3]-cX[2],cX[4]-cX[3]];
   const hdrs=['DESCRIPTION','PRICE','QTY','AMOUNT'];
   const alns=['left','center','center','right'];
-  const RH=20, HH=22, NR=10;
+  const RH=20,HH=22,NR=10;
 
-  // Header
-  hdrs.forEach((h,i)=>{ cell(cX[i],TT,cW[i],HH,LGR); ctxt(h,cX[i],cW[i],TT,HH,alns[i],true,8); });
+  hdrs.forEach((h,i)=>{cell(cX[i],TT,cW[i],HH,LGR);ctxt(h,cX[i],cW[i],TT,HH,alns[i],true,8);});
 
-  // Build items
-  const addrA = g('addrA').value || 'Location A';
-  const addrB = g('addrB').value || 'Location B';
-  const delivAmt = q.base + q.distCost + q.fuelCostTotal + q.labourCost;
-
-  // Route item: description + TWO sub-lines (From / To) each on own line
-  const descColW = cX[1] - cX[0] - 8; // usable width in description col
-  const routeTitle = 'Pickup & Delivery (' + q.km.toFixed(0) + ' km)';
-  const fromLine   = 'From: ' + addrA;
-  const toLine     = 'To:   ' + addrB;
-
-  // Wrap each sub-line independently within description column
+  const addrA=g('addrA').value||'Location A';
+  const addrB=g('addrB').value||'Location B';
+  const delivAmt=q.base+q.distCost+q.fuelCostTotal+q.labourCost;
+  const descColW=cX[1]-cX[0]-8;
   doc.setFontSize(7.5);
-  const fromWrapped = doc.splitTextToSize(fromLine, descColW);
-  const toWrapped   = doc.splitTextToSize(toLine,   descColW);
-  const subLineCount = fromWrapped.length + toWrapped.length;
-  const routeRH = RH + subLineCount * 9 + 4; // dynamic height
+  const fromW=doc.splitTextToSize('From: '+addrA,descColW);
+  const toW=doc.splitTextToSize('To:   '+addrB,descColW);
+  const routeRH=RH+(fromW.length+toW.length)*9+4;
 
-  const items = [
-    { isRoute: true, desc: routeTitle,
-      fromLines: fromWrapped, toLines: toWrapped,
-      price: fmt(delivAmt), qty:'1', amount: fmt(delivAmt), height: routeRH },
-    ...q.surchargeItems.map(([l,a])=>({
-      isRoute:false, desc:l+' Surcharge', fromLines:[], toLines:[],
-      price:fmt(a), qty:'1', amount:fmt(a), height: RH
-    }))
+  const items=[
+    {isRoute:true,desc:'Pickup & Delivery ('+q.km.toFixed(0)+' km)',
+     fromLines:fromW,toLines:toW,price:fmt(delivAmt),qty:'1',amount:fmt(delivAmt),height:routeRH},
+    ...q.surchargeItems.map(([l,a])=>({isRoute:false,desc:l+' Surcharge',fromLines:[],toLines:[],
+     price:fmt(a),qty:'1',amount:fmt(a),height:RH}))
   ];
 
-  // Draw rows
-  let rowY = TT + HH;
-  let drawnRows = 0;
-
-  for(let r=0; r<NR; r++){
-    const item = items[r];
-    const thisH = item ? item.height : RH;
-
-    // Draw all 4 column borders for this row
-    cW.forEach((_,i) => cell(cX[i], rowY, cW[i], thisH));
-
+  let rowY=TT+HH,drawn=0;
+  for(let r=0;r<NR;r++){
+    const item=items[r];const thisH=item?item.height:RH;
+    cW.forEach((_,i)=>cell(cX[i],rowY,cW[i],thisH));
     if(item){
-      // Description col: title bold, sub-lines small grey
-      doc.setFont('helvetica','normal'); doc.setFontSize(8.5); st(...BLK);
-      doc.text(item.desc, cX[0]+4, rowY + 13);
-
+      doc.setFont('helvetica','normal');doc.setFontSize(8.5);st(...BLK);
+      doc.text(item.desc,cX[0]+4,rowY+13);
       if(item.isRoute){
-        doc.setFontSize(7.5); st(...MGR);
-        let subY = rowY + 23;
-        item.fromLines.forEach(ln => { doc.text(ln, cX[0]+4, subY); subY+=9; });
-        item.toLines.forEach(  ln => { doc.text(ln, cX[0]+4, subY); subY+=9; });
+        doc.setFontSize(7.5);st(...MGR);
+        let sy=rowY+23;
+        item.fromLines.forEach(ln=>{doc.text(ln,cX[0]+4,sy);sy+=9;});
+        item.toLines.forEach(ln=>{doc.text(ln,cX[0]+4,sy);sy+=9;});
       }
-
-      // Price, Qty, Amount cols
-      [[item.price,'center'],[item.qty,'center'],[item.amount,'right']]
-        .forEach(([val,aln],ci)=>{
-          doc.setFont('helvetica','normal'); doc.setFontSize(8.5); st(...BLK);
-          const colIdx = ci+1;
-          const ty = rowY + thisH * 0.65;
-          if(aln==='center') doc.text(val, cX[colIdx]+cW[colIdx]/2, ty, {align:'center'});
-          else               doc.text(val, cX[colIdx]+cW[colIdx]-4, ty, {align:'right'});
-        });
+      [[item.price,'center'],[item.qty,'center'],[item.amount,'right']].forEach(([val,aln],ci)=>{
+        doc.setFont('helvetica','normal');doc.setFontSize(8.5);st(...BLK);
+        const ty=rowY+thisH*0.65;
+        if(aln==='center') doc.text(val,cX[ci+1]+cW[ci+1]/2,ty,{align:'center'});
+        else               doc.text(val,cX[ci+1]+cW[ci+1]-4,ty,{align:'right'});
+      });
     }
-
-    rowY += thisH;
-    drawnRows++;
+    rowY+=thisH;drawn++;
   }
+  while(drawn<NR){cW.forEach((_,i)=>cell(cX[i],rowY,cW[i],RH));rowY+=RH;drawn++;}
 
-  // Fill remaining empty rows if items < NR
-  while(drawnRows < NR){
-    cW.forEach((_,i) => cell(cX[i], rowY, cW[i], RH));
-    rowY += RH;
-    drawnRows++;
-  }
-
-  // ── TOTALS ───────────────────────────────────────
-  // Label col = cX[2], width = cW[2] (68pt) — fits "HST/GST (13%)"
-  // Value col = cX[3], width = cW[3]
-  const TB = rowY;
-  const hstPct   = q.hstExempt ? 0 : 13;
-  const hstLabel = 'HST/GST (' + hstPct + '%)';
-
-  [['TOTAL',   fmt(q.subtotal), false],
-   ['DISC.',   q.discAmt>0 ? '- '+fmt(q.discAmt) : '$0.00', false],
-   [hstLabel,  fmt(q.hstAmt),  false],
-   ['FINAL',   fmt(q.total),   true]]
+  // TOTALS
+  const TB=rowY;
+  const hstPct=q.hstExempt?0:13;
+  const hstLabel='HST/GST ('+hstPct+'%)';
+  [['TOTAL',fmt(q.subtotal),false],
+   ['DISC.',q.discAmt>0?'- '+fmt(q.discAmt):'$0.00',false],
+   [hstLabel,fmt(q.hstAmt),false],
+   ['FINAL',fmt(q.total),true]]
     .forEach(([lbl,val,fin],i)=>{
-      const yt=TB+i*RH; const tc=fin?WHT:BLK;
-      // Label cell — wider to fit HST text
+      const yt=TB+i*RH;const tc=fin?WHT:BLK;
       cell(cX[2],yt,cW[2],RH,fin?RED:LGR);
-      // Value cell
       cell(cX[3],yt,cW[3],RH,fin?RED:null);
-      // Label text — reduce font size slightly so HST/GST (13%) fits
-      doc.setFont('helvetica','bold'); doc.setFontSize(8); st(...tc);
-      doc.text(lbl, cX[2]+cW[2]/2, yt+RH*0.65, {align:'center'});
-      // Value text
-      doc.setFont('helvetica', fin?'bold':'normal'); doc.setFontSize(8.5); st(...tc);
-      doc.text(val, cX[3]+cW[3]-4, yt+RH*0.65, {align:'right'});
+      doc.setFont('helvetica','bold');doc.setFontSize(8);st(...tc);
+      doc.text(lbl,cX[2]+cW[2]/2,yt+RH*0.65,{align:'center'});
+      doc.setFont('helvetica',fin?'bold':'normal');doc.setFontSize(8.5);st(...tc);
+      doc.text(val,cX[3]+cW[3]-4,yt+RH*0.65,{align:'right'});
     });
 
-  // ── CLOSING LINE ─────────────────────────────────
-  let tcY = TB + 4*RH + 16;
-  doc.setFont('helvetica','bolditalic'); doc.setFontSize(9); st(...RED);
-  doc.text('We look forward to your business!', 306, tcY, {align:'center'});
-  tcY += 16;
+  // CLOSING + TERMS
+  let tcY=TB+4*RH+16;
+  doc.setFont('helvetica','bolditalic');doc.setFontSize(9);st(...RED);
+  doc.text('We look forward to your business!',306,tcY,{align:'center'});tcY+=16;
 
-  // ── TERMS ────────────────────────────────────────
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); st(...BLK);
-  doc.text('TERMS & CONDITIONS', PL, tcY); tcY+=13;
-  const terms=[
-    'Prices valid until '+dateFmt(validUntil)+'.',
+  doc.setFont('helvetica','bold');doc.setFontSize(9);st(...BLK);
+  doc.text('TERMS & CONDITIONS',PL,tcY);tcY+=13;
+  const terms=['Prices valid until '+dateFmt(validUntil)+'.',
     'A 50% deposit is required to confirm and schedule the delivery.',
     'The remaining balance is due upon successful delivery.',
     'Fuel surcharges are estimated and may vary slightly at time of delivery.',
@@ -1433,25 +1382,25 @@ function generatePDF() {
     'The client is responsible for ensuring safe and accessible entry at both locations.',
     'Fragile or high-value items must be declared at time of booking.',
     'Changes to delivery address or schedule after confirmation may result in revised pricing.',
-    'All quotes are in Canadian Dollars (CAD) and include applicable surcharges as itemized above.',
-  ];
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); st(...DGR);
+    'All quotes are in Canadian Dollars (CAD) and include applicable surcharges as itemized above.'];
+  doc.setFont('helvetica','normal');doc.setFontSize(7.5);st(...DGR);
   terms.forEach(t=>{
-    doc.splitTextToSize('• '+t, cX[2]-PL-8).forEach(ln=>{
-      if(tcY<PB){ doc.text(ln,PL,tcY); tcY+=10; }
-    });
-    tcY+=1;
+    doc.splitTextToSize('• '+t,cX[2]-PL-8).forEach(ln=>{
+      if(tcY<PB){doc.text(ln,PL,tcY);tcY+=10;}
+    });tcY+=1;
   });
 
-  // ── FOOTER ───────────────────────────────────────
-  ss(...RED); doc.setLineWidth(0.8); doc.line(PL,758,PR,758);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); st(...MGR);
+  // FOOTER — simple line, no red
+  ss(...LGR);doc.setLineWidth(0.5);doc.line(PL,758,PR,758);
+  doc.setFont('helvetica','normal');doc.setFontSize(7);st(...MGR);
   doc.text(company+'  \u00b7  33 Osborn Ave, Brantford, ON  \u00b7  (647) 709-4052  \u00b7  www.khairgroup.ca',
            306,770,{align:'center'});
 
   doc.save('KG_Quote_'+ref+'.pdf');
-  const t=g('toast'); t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000);
+  const t=g('toast');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);
 }
+
+
 
 // Default delivery date
 const td=new Date(); td.setDate(td.getDate()+3);
@@ -1735,7 +1684,7 @@ function generateInvoice() {
   const today      = new Date();
   const dateFmt    = d => d.toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
 
-  const invoiceNum  = document.getElementById('invoiceNum').value  || ('INV-' + Date.now());
+  const invoiceNum  = document.getElementById('invoiceNum').value || ('INV-'+Date.now());
   const dueDateRaw  = document.getElementById('invoiceDueDate').value;
   const dueDate     = dueDateRaw ? new Date(dueDateRaw+'T12:00:00') : new Date(today.getTime()+30*86400000);
   const termsNote   = document.getElementById('invoiceTermsNote').value || 'Payment due within 30 days. Late payments subject to 5% fee.';
@@ -1745,239 +1694,217 @@ function generateInvoice() {
 
   const company   = g('companyName').value || 'Khair Group';
   const custName  = g('custName').value    || 'Valued Customer';
-  const custPhone = g('custPhone').value   || '';
+  // Clean phone — remove any characters that cause jsPDF spacing issues
+  const custPhone = (g('custPhone').value || '').replace(/[^\d\s\(\)\+\-]/g,'').trim();
   const custEmail = g('custEmail').value   || '';
   const custAddr  = g('custAddr') ? (g('custAddr').value||'') : '';
 
   const doc = new jsPDF({ unit:'pt', format:'letter', orientation:'portrait' });
   const PL=62, PR=590, PB=748;
 
-  const sf = (r,g2,b) => doc.setFillColor(r,g2,b);
-  const ss = (r,g2,b) => doc.setDrawColor(r,g2,b);
-  const st = (r,g2,b) => doc.setTextColor(r,g2,b);
+  const sf=(r,g2,b)=>doc.setFillColor(r,g2,b);
+  const ss=(r,g2,b)=>doc.setDrawColor(r,g2,b);
+  const st=(r,g2,b)=>doc.setTextColor(r,g2,b);
+  const RED=[204,31,31],BLK=[15,15,15],MGR=[120,120,120],
+        DGR=[50,50,50],LGR=[220,220,220],WHT=[255,255,255],
+        VLG=[245,245,245],GOLD=[230,168,23],
+        GREEN=[44,130,60],ORANGE=[200,80,0];
 
-  // Colours
-  const RED=[204,31,31], BLK=[15,15,15], MGR=[120,120,120],
-        DGR=[50,50,50],  LGR=[220,220,220], WHT=[255,255,255],
-        VLG=[245,245,245], GOLD=[230,168,23],
-        GREEN=[44,130,60], ORANGE=[200,80,0];
-
-  const cell = (x,y,w,h,fill) => {
-    if(fill){ sf(...fill); doc.rect(x,y,w,h,'F'); }
-    ss(...LGR); doc.setLineWidth(0.4); doc.rect(x,y,w,h,'S');
+  const cell=(x,y,w,h,fill)=>{
+    if(fill){sf(...fill);doc.rect(x,y,w,h,'F');}
+    ss(...LGR);doc.setLineWidth(0.4);doc.rect(x,y,w,h,'S');
   };
-  const ctxt = (txt,x,w,y,h,aln,bold,sz,col) => {
+  const ctxt=(txt,x,w,y,h,aln,bold,sz,col)=>{
     doc.setFont('helvetica',bold?'bold':'normal');
-    doc.setFontSize(sz||8.5); st(...(col||BLK));
+    doc.setFontSize(sz||8.5);st(...(col||BLK));
     const ty=y+h*0.65;
-    if(aln==='left')        doc.text(String(txt),x+4,ty);
+    if(aln==='left')       doc.text(String(txt),x+4,ty);
     else if(aln==='center') doc.text(String(txt),x+w/2,ty,{align:'center'});
-    else                    doc.text(String(txt),x+w-4,ty,{align:'right'});
+    else                   doc.text(String(txt),x+w-4,ty,{align:'right'});
   };
 
-  // ── LOGO ──────────────────────────────────────────
-  try { doc.addImage(LOGO_DATA_URI,'PNG',PL,20,100,100,undefined,'FAST'); } catch(e){}
+  // LOGO
+  try{doc.addImage(LOGO_DATA_URI,'PNG',PL,20,100,100,undefined,'FAST');}catch(e){}
 
-  // ── INVOICE heading ───────────────────────────────
-  doc.setFont('helvetica','bold'); doc.setFontSize(48); st(...LGR);
-  doc.text('INVOICE',PR,62,{align:'right'});
+  // INVOICE heading — pushed left so stamp doesn't overlap
+  doc.setFont('helvetica','bold');doc.setFontSize(44);st(...LGR);
+  doc.text('INVOICE',440,62,{align:'right'});
 
-  // ── PAID / UNPAID STAMP ───────────────────────────
+  // PAID / UNPAID STAMP — top right, clear of heading
   if(isPaid){
-    sf(...GREEN); doc.setLineWidth(2.5); ss(...GREEN);
-    doc.roundedRect(PR-115,18,110,36,4,4,'FD');
-    doc.setFont('helvetica','bold'); doc.setFontSize(16); st(...WHT);
-    doc.text('✓  PAID', PR-60, 42, {align:'center'});
+    sf(...GREEN);ss(...GREEN);doc.setLineWidth(2);
+    doc.roundedRect(448,18,136,36,4,4,'FD');
+    doc.setFont('helvetica','bold');doc.setFontSize(14);st(...WHT);
+    doc.text('\u2713  PAID',516,41,{align:'center'});
   } else {
-    sf(...ORANGE); ss(...ORANGE); doc.setLineWidth(2);
-    doc.roundedRect(PR-115,18,110,36,4,4,'S');
-    doc.setFont('helvetica','bold'); doc.setFontSize(13); st(...ORANGE);
-    doc.text('PAYMENT DUE', PR-60, 41, {align:'center'});
+    sf(...WHT);doc.roundedRect(448,18,136,36,4,4,'F');
+    ss(...ORANGE);doc.setLineWidth(2);doc.roundedRect(448,18,136,36,4,4,'S');
+    doc.setFont('helvetica','bold');doc.setFontSize(11);st(...ORANGE);
+    doc.text('PAYMENT DUE',516,41,{align:'center'});
   }
 
-  // ── META BOX (Invoice # / Date / Due / Quote ref) ─
+  // Company address
+  doc.setFont('helvetica','normal');doc.setFontSize(8.5);st(...BLK);
+  ['33 Osborn Ave','Brantford, ON, CA, N3T 6R1','(647) 709-4052','www.khairgroup.ca']
+    .forEach((line,i)=>doc.text(line,PL,132+i*13));
+
+  // META BOX (gold accent)
   const mx=326,my=68,rmh=15,pad=6;
-  const metaRows = [
-    ['INVOICE #:', invoiceNum],
-    ['DATE:',      dateFmt(today)],
-    ['DUE DATE:',  dateFmt(dueDate)],
-  ];
-  if(quoteRef) metaRows.push(['QUOTE REF:', quoteRef]);
-  const bh = metaRows.length * rmh + pad*2;
-
-  sf(...VLG); doc.rect(mx,my,PR-mx,bh,'F');
-  ss(...LGR); doc.setLineWidth(0.5); doc.rect(mx,my,PR-mx,bh,'S');
-  sf(...GOLD); doc.rect(mx,my,3,bh,'F');   // gold accent
-
+  const metaRows=[['INVOICE #:',invoiceNum],['DATE:',dateFmt(today)],['DUE DATE:',dateFmt(dueDate)]];
+  if(quoteRef) metaRows.push(['QUOTE REF:',quoteRef]);
+  const bh=metaRows.length*rmh+pad*2;
+  sf(...VLG);doc.rect(mx,my,PR-mx,bh,'F');
+  ss(...LGR);doc.setLineWidth(0.5);doc.rect(mx,my,PR-mx,bh,'S');
+  sf(...GOLD);doc.rect(mx,my,3,bh,'F');
   metaRows.forEach(([lbl,val],i)=>{
     const ry=my+pad+i*rmh+rmh*0.65;
-    doc.setFont('helvetica','bold');   doc.setFontSize(8); st(...BLK); doc.text(lbl,mx+10,ry);
-    doc.setFont('helvetica','normal'); doc.text(val,PR-6,ry,{align:'right'});
+    doc.setFont('helvetica','bold');doc.setFontSize(8);st(...BLK);doc.text(lbl,mx+10,ry);
+    doc.setFont('helvetica','normal');doc.text(val,PR-6,ry,{align:'right'});
   });
 
-  // ── COMPANY ADDRESS ───────────────────────────────
-  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); st(...BLK);
-  ['33 Osborn Ave','Brantford, ON, CA, N3T 6R1','(647) 709-4052','www.khairgroup.ca']
-    .forEach((line,i) => doc.text(line,PL,132+i*13));
-
-  // ── CLIENT BLOCK ─────────────────────────────────
-  const cx=326, vx=396;
-  let clY = my + bh + 16;
+  // CLIENT BLOCK
+  const cx=326,vx=396;
+  let clY=my+bh+16;
+  const contact=custPhone||custEmail||'\u2014';
   const clientRows=[['Bill To',custName]];
   if(custAddr) clientRows.push(['Address',custAddr]);
-  clientRows.push(['Contact',custPhone||custEmail||'—']);
+  clientRows.push(['Contact',contact]);
   clientRows.forEach(([lbl,val])=>{
-    doc.setFont('helvetica','bold');   doc.setFontSize(8.5); st(...BLK); doc.text(lbl,cx,clY);
+    doc.setFont('helvetica','bold');doc.setFontSize(8.5);st(...BLK);doc.text(lbl,cx,clY);
     doc.setFont('helvetica','normal');
     const lines=doc.splitTextToSize(val,PR-vx);
     lines.forEach((ln,i)=>doc.text(ln,vx,clY+i*13));
     clY+=14*Math.max(1,lines.length);
   });
 
-  // ── RED SEPARATOR ─────────────────────────────────
-  const sepY = Math.max(clY+8, 232);
-  ss(...RED); doc.setLineWidth(1.0); doc.line(PL,sepY,PR,sepY);
-
-  // ── TABLE ─────────────────────────────────────────
-  const TT = sepY + 6;
+  // TABLE — no red line above
+  const TT=Math.max(clY+14,238);
   const cX=[PL,330,424,492,PR];
   const cW=[cX[1]-cX[0],cX[2]-cX[1],cX[3]-cX[2],cX[4]-cX[3]];
   const hdrs=['DESCRIPTION','PRICE','QTY','AMOUNT'];
   const alns=['left','center','center','right'];
-  const RH=20, HH=22, NR=10;
+  const RH=20,HH=22,NR=10;
 
-  hdrs.forEach((h,i)=>{ cell(cX[i],TT,cW[i],HH,LGR); ctxt(h,cX[i],cW[i],TT,HH,alns[i],true,8); });
+  hdrs.forEach((h,i)=>{cell(cX[i],TT,cW[i],HH,LGR);ctxt(h,cX[i],cW[i],TT,HH,alns[i],true,8);});
 
-  // Items (same as quote)
-  const addrA = g('addrA').value || 'Location A';
-  const addrB = g('addrB').value || 'Location B';
-  const delivAmt = q.base + q.distCost + q.fuelCostTotal + q.labourCost;
-  const descColW = cX[1]-cX[0]-8;
+  const addrA=g('addrA').value||'Location A';
+  const addrB=g('addrB').value||'Location B';
+  const delivAmt=q.base+q.distCost+q.fuelCostTotal+q.labourCost;
+  const descColW=cX[1]-cX[0]-8;
   doc.setFontSize(7.5);
-  const fromW = doc.splitTextToSize('From: '+addrA, descColW);
-  const toW   = doc.splitTextToSize('To:   '+addrB, descColW);
-  const routeRH = RH + (fromW.length+toW.length)*9+4;
+  const fromW=doc.splitTextToSize('From: '+addrA,descColW);
+  const toW=doc.splitTextToSize('To:   '+addrB,descColW);
+  const routeRH=RH+(fromW.length+toW.length)*9+4;
 
   const items=[
-    { isRoute:true, desc:'Pickup & Delivery ('+q.km.toFixed(0)+' km)',
-      fromLines:fromW, toLines:toW,
-      price:fmt(delivAmt), qty:'1', amount:fmt(delivAmt), height:routeRH },
-    ...q.surchargeItems.map(([l,a])=>({
-      isRoute:false, desc:l+' Surcharge', fromLines:[], toLines:[],
-      price:fmt(a), qty:'1', amount:fmt(a), height:RH
-    }))
+    {isRoute:true,desc:'Pickup & Delivery ('+q.km.toFixed(0)+' km)',
+     fromLines:fromW,toLines:toW,price:fmt(delivAmt),qty:'1',amount:fmt(delivAmt),height:routeRH},
+    ...q.surchargeItems.map(([l,a])=>({isRoute:false,desc:l+' Surcharge',fromLines:[],toLines:[],
+     price:fmt(a),qty:'1',amount:fmt(a),height:RH}))
   ];
 
-  let rowY=TT+HH, drawn=0;
+  let rowY=TT+HH,drawn=0;
   for(let r=0;r<NR;r++){
-    const item=items[r];
-    const thisH=item?item.height:RH;
+    const item=items[r];const thisH=item?item.height:RH;
     cW.forEach((_,i)=>cell(cX[i],rowY,cW[i],thisH));
     if(item){
-      doc.setFont('helvetica','normal'); doc.setFontSize(8.5); st(...BLK);
+      doc.setFont('helvetica','normal');doc.setFontSize(8.5);st(...BLK);
       doc.text(item.desc,cX[0]+4,rowY+13);
       if(item.isRoute){
-        doc.setFontSize(7.5); st(...MGR);
+        doc.setFontSize(7.5);st(...MGR);
         let sy=rowY+23;
         item.fromLines.forEach(ln=>{doc.text(ln,cX[0]+4,sy);sy+=9;});
         item.toLines.forEach(ln=>{doc.text(ln,cX[0]+4,sy);sy+=9;});
       }
       [[item.price,'center'],[item.qty,'center'],[item.amount,'right']].forEach(([val,aln],ci)=>{
-        doc.setFont('helvetica','normal'); doc.setFontSize(8.5); st(...BLK);
+        doc.setFont('helvetica','normal');doc.setFontSize(8.5);st(...BLK);
         const ty=rowY+thisH*0.65;
         if(aln==='center') doc.text(val,cX[ci+1]+cW[ci+1]/2,ty,{align:'center'});
         else               doc.text(val,cX[ci+1]+cW[ci+1]-4,ty,{align:'right'});
       });
     }
-    rowY+=thisH; drawn++;
+    rowY+=thisH;drawn++;
   }
-  while(drawn<NR){ cW.forEach((_,i)=>cell(cX[i],rowY,cW[i],RH)); rowY+=RH; drawn++; }
+  while(drawn<NR){cW.forEach((_,i)=>cell(cX[i],rowY,cW[i],RH));rowY+=RH;drawn++;}
 
-  // ── TOTALS ────────────────────────────────────────
+  // TOTALS
   const TB=rowY;
-  const hstPct  = q.hstExempt?0:13;
-  const hstLbl  = 'HST/GST ('+hstPct+'%)';
-  [['TOTAL',   fmt(q.subtotal), false],
-   ['DISC.',   q.discAmt>0?'- '+fmt(q.discAmt):'$0.00', false],
-   [hstLbl,   fmt(q.hstAmt),  false],
-   ['FINAL',  fmt(q.total),   true]]
+  const hstPct=q.hstExempt?0:13;
+  const hstLabel='HST/GST ('+hstPct+'%)';
+  [['TOTAL',fmt(q.subtotal),false],
+   ['DISC.',q.discAmt>0?'- '+fmt(q.discAmt):'$0.00',false],
+   [hstLabel,fmt(q.hstAmt),false],
+   ['FINAL',fmt(q.total),true]]
     .forEach(([lbl,val,fin],i)=>{
-      const yt=TB+i*RH; const tc=fin?WHT:BLK;
+      const yt=TB+i*RH;const tc=fin?WHT:BLK;
       cell(cX[2],yt,cW[2],RH,fin?RED:LGR);
       cell(cX[3],yt,cW[3],RH,fin?RED:null);
-      doc.setFont('helvetica','bold'); doc.setFontSize(8); st(...tc);
+      doc.setFont('helvetica','bold');doc.setFontSize(8);st(...tc);
       doc.text(lbl,cX[2]+cW[2]/2,yt+RH*0.65,{align:'center'});
-      doc.setFont('helvetica',fin?'bold':'normal'); doc.setFontSize(8.5); st(...tc);
+      doc.setFont('helvetica',fin?'bold':'normal');doc.setFontSize(8.5);st(...tc);
       doc.text(val,cX[3]+cW[3]-4,yt+RH*0.65,{align:'right'});
     });
 
-  // ── PAYMENT INFO BOX ─────────────────────────────
-  let infoY = TB + 4*RH + 14;
-
-  // Active payment methods
-  const methodLabels = {
-    etransfer:'E-Transfer', bank:'Bank Transfer', credit:'Credit Card',
-    cash:'Cash', cheque:'Cheque', prepaid:'Full Payment Prepaid'
-  };
-  const activeMethods = Object.entries(window._payMethods)
+  // PAYMENT STATUS BOX (below totals, above terms)
+  let infoY=TB+4*RH+14;
+  const methodLabels={etransfer:'E-Transfer',bank:'Bank Transfer',credit:'Credit Card',
+                      cash:'Cash',cheque:'Cheque',prepaid:'Full Payment Prepaid'};
+  const activeMethods=Object.entries(window._payMethods)
     .filter(([,v])=>v).map(([k])=>methodLabels[k]).join('  |  ');
+  const boxH=isPaid?24:46;
 
-  // Payment info box
-  sf(...VLG); doc.rect(PL, infoY, PR-PL, isPaid?22:44, 'F');
-  ss(...LGR); doc.setLineWidth(0.4); doc.rect(PL, infoY, PR-PL, isPaid?22:44, 'S');
-  sf(...GOLD); doc.rect(PL, infoY, 3, isPaid?22:44, 'F');
+  sf(...VLG);doc.rect(PL,infoY,PR-PL,boxH,'F');
+  ss(...LGR);doc.setLineWidth(0.4);doc.rect(PL,infoY,PR-PL,boxH,'S');
+  if(isPaid){sf(...GREEN);}else{sf(...ORANGE);}doc.rect(PL,infoY,3,boxH,'F');
 
-  doc.setFont('helvetica','bold'); doc.setFontSize(8.5); st(...BLK);
   if(isPaid){
-    doc.text('Payment received — Thank you!', PL+10, infoY+14);
-    doc.setFont('helvetica','normal'); doc.setFontSize(8);
-    if(payRef) doc.text('Reference: '+payRef, PR-6, infoY+14, {align:'right'});
+    doc.setFont('helvetica','bold');doc.setFontSize(9);st(...GREEN);
+    doc.text('Payment Received \u2014 Thank you!',PL+10,infoY+15);
+    if(payRef){doc.setFont('helvetica','normal');doc.setFontSize(8);st(...DGR);
+      doc.text('Ref: '+payRef,PR-6,infoY+15,{align:'right'});}
   } else {
-    doc.text('Payment due by: '+dateFmt(dueDate), PL+10, infoY+13);
-    doc.setFont('helvetica','normal'); doc.setFontSize(8); st(...DGR);
-    if(activeMethods) doc.text('Accepted: '+activeMethods, PL+10, infoY+26);
-    if(payRef){ doc.setFont('helvetica','bold'); st(...BLK);
-      doc.text('E-Transfer: '+payRef, PR-6, infoY+13, {align:'right'}); }
+    doc.setFont('helvetica','bold');doc.setFontSize(9);st(...BLK);
+    doc.text('Payment due by: '+dateFmt(dueDate),PL+10,infoY+14);
+    if(payRef){doc.setFont('helvetica','bold');doc.setFontSize(8.5);st(...BLK);
+      doc.text('E-Transfer: '+payRef,PR-6,infoY+14,{align:'right'});}
+    if(activeMethods){doc.setFont('helvetica','normal');doc.setFontSize(8);st(...DGR);
+      doc.text('Accepted: '+activeMethods,PL+10,infoY+28);}
   }
-  infoY += (isPaid?22:44) + 14;
+  infoY+=boxH+14;
 
-  // ── TERMS & CONDITIONS ────────────────────────────
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); st(...BLK);
-  doc.text('TERMS & CONDITIONS', PL, infoY); infoY+=13;
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); st(...DGR);
-
-  const invTerms = [
-    termsNote,
+  // TERMS
+  doc.setFont('helvetica','bold');doc.setFontSize(9);st(...BLK);
+  doc.text('TERMS & CONDITIONS',PL,infoY);infoY+=13;
+  doc.setFont('helvetica','normal');doc.setFontSize(7.5);st(...DGR);
+  const invTerms=[termsNote,
     'All payments via e-transfer, bank transfer, or credit card.',
     'E-Transfer ID: '+payRef,
-    isPaid ? 'This document serves as an official receipt of payment.' :
-             'Full payment may be required prior to pickup for certain deliveries.',
+    isPaid?'This document serves as an official receipt of payment.':
+           'Full payment may be required prior to pickup for certain deliveries.',
     'Khair Group is not responsible for delays caused by weather, road closures, or conditions beyond our control.',
     'Disputes must be raised within 5 business days of delivery.',
-    'All amounts are in Canadian Dollars (CAD) and include applicable taxes as shown.',
-  ];
+    'All amounts are in Canadian Dollars (CAD) and include applicable taxes as shown.'];
   invTerms.forEach(t=>{
-    doc.splitTextToSize('• '+t, cX[2]-PL-8).forEach(ln=>{
-      if(infoY<PB){ doc.text(ln,PL,infoY); infoY+=10; }
-    });
-    infoY+=1;
+    doc.splitTextToSize('• '+t,cX[2]-PL-8).forEach(ln=>{
+      if(infoY<PB){doc.text(ln,PL,infoY);infoY+=10;}
+    });infoY+=1;
   });
 
-  // ── CLOSING MESSAGE ───────────────────────────────
-  infoY += 6;
-  doc.setFont('helvetica','bolditalic'); doc.setFontSize(9.5); st(...RED);
-  doc.text('Thank you for your business — we look forward to working with you again!',
-           306, infoY, {align:'center'});
+  // CLOSING
+  infoY+=6;
+  doc.setFont('helvetica','bolditalic');doc.setFontSize(9.5);st(...RED);
+  doc.text('Thank you for your business \u2014 we look forward to working with you again!',
+           306,infoY,{align:'center'});
 
-  // ── FOOTER ───────────────────────────────────────
-  ss(...RED); doc.setLineWidth(0.8); doc.line(PL,758,PR,758);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); st(...MGR);
+  // FOOTER — light grey line only
+  ss(...LGR);doc.setLineWidth(0.5);doc.line(PL,758,PR,758);
+  doc.setFont('helvetica','normal');doc.setFontSize(7);st(...MGR);
   doc.text(company+'  \u00b7  33 Osborn Ave, Brantford, ON  \u00b7  (647) 709-4052  \u00b7  www.khairgroup.ca',
            306,770,{align:'center'});
 
   doc.save('KG_Invoice_'+invoiceNum+'.pdf');
   const t=document.getElementById('invoiceToast');
-  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000);
+  t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);
 }
 
 </script>
